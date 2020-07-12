@@ -8,7 +8,7 @@
 START:                  ; first instruction of program
 
 * Put program code here
-
+    MOVE.B	#1,D1
     SIMHALT             ; halt simulator
 
 * Put variables and constants here
