@@ -7,6 +7,8 @@
     ORG    $1000
 START:                  ; first instruction of program
 
+    add.b #1,d1
+
 * Put program code here
 
     SIMHALT             ; halt simulator
@@ -14,6 +16,7 @@ START:                  ; first instruction of program
 * Put variables and constants here
 
     END    START        ; last line of source
+
 
 *~Font name~Courier New~
 *~Font size~10~
