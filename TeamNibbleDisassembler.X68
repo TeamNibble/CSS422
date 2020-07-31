@@ -10,6 +10,7 @@ START:                  ; first instruction of program
 * Put program code here
 FIRST_FOUR_BITS     MOVE.W  D4,D5   *Move the instruction to decode
                     LSR.W   #8,D5   *Shift right 8 bits to get the first four bits
+                    LSR.W   #4,D5   *Shift again to access first 4 bits
                     CMPI.B  #$00,D5 *If first 4 bits = 0000
                     BEQ     IS_0000
                     CMPI.B  #$01,D5 *If first 4 bits = 0001
@@ -48,9 +49,9 @@ DECODE_4E   MOVE.W  D4,D5
             BEQ     OPCODE_RTS
             
             
-OPCODE_LEA  MOVE.B  #$4C,(A1)+  *Move char L
-            MOVE.B  #$45,(A1)+  *Move char E
-            MOVE.B  #$41,(A1)+  *Move char A
+OPCODE_LEA  MOVE.B  #$4C,(A2)+  *Move char L
+            MOVE.B  #$45,(A2)+  *Move char E
+            MOVE.B  #$41,(A2)+  *Move char A
             BRA     GET_EA      *Decode EA
 
 IS_0110     MOVE.W  D4,D5
@@ -58,9 +59,9 @@ IS_0110     MOVE.W  D4,D5
             CMPI.B  #$60,D5     *Check for BRA
             BEQ     OPCODE_BRA  
 
-OPCODE_BRA  MOVE.B  #$42,(A1)+  *Move char B
-            MOVE.B  #$52,(A1)+  *Move char R
-            MOVE.B  #$41,(A1)+  *Move char A
+OPCODE_BRA  MOVE.B  #$42,(A2)+  *Move char B
+            MOVE.B  #$52,(A2)+  *Move char R
+            MOVE.B  #$41,(A2)+  *Move char A
             MOVE.W  D4,D5       
             ADD.W   (A2),D5     *<PC> + Displacement
             
@@ -74,6 +75,52 @@ GET_EA      MOVE.W  D4,D5       *Move the instruction to decode
             
 MODE_000
 
+*-----------------------------------------------------
+*First four bits are equal to 1101 - prompt add
+*-----------------------------------------------------
+OPCODE_ADD  MOVE.B  #$41, (A2)+  *Move char A
+            MOVE.B  #$44, (A2)+  *Move char D
+            MOVE.B  #$44, (A2)+  *Move char D
+            JSR     BIT8910      *Code to get bit 8 9 and 10 into D5
+
+*-----------------------------------------------------
+*Bit shifting to access bits 5, 6, 7 from left of word
+*-----------------------------------------------------
+BIT567  MOVE.W  D4, D5
+        LSL.W   #4, D5  *Drops first 4 bits
+        LSR.W   #8, D5  *Pushes to the right 8
+        LSR.W   #5, D5  *Pushes to the right 5 to finalize
+        RTS          
+
+*-----------------------------------------------------
+*Bit shifting to access bits 8, 9, 10 from left of word
+*-----------------------------------------------------
+BIT8910 MOVE.W  D4, D5
+        LSL.W   #7, D5  *Drop first 7 bits
+        LSR.W   #8, D5  *Pushes to the right 8
+        LSR.W   #5, D5  *Pushes to the right 5 to finalize
+        RTS
+
+*-----------------------------------------------------
+*Bit shifting to access bits 11, 12, 13 from left of word
+*-----------------------------------------------------
+BIT111213   MOVE.W  D4, D5
+            LSL.W   #8, D5  *Drop first 8 bits
+            LSL.W   #2, D5  *Drop 10th bit
+            LSR.W   #8, D5  *Pushes to the right 8
+            LSR.W   #5, D5  *Pushes to the right 5 to finalize
+            RTS 
+
+*-----------------------------------------------------
+*Bit shifting to access bits 14, 15, 16 from left of word
+*-----------------------------------------------------
+BIT141516   MOVE.W  D4, D5
+            LSL.W   #8, D5  *Drop first 8 bits
+            LSL.W   #5, D5  *Drop 13th bit
+            LSR.W   #8, D5  *Pushes to the right 8
+            LSR.W   #5, D5  *Pushes to the right 5 to finalize
+            RTS 
+            
 OPCODE_NOT
 
 OPCODE_NOP
@@ -85,6 +132,7 @@ OPCODE_RTS
 * Put variables and constants here
 
     END    START        ; last line of source
+
 
 
 *~Font name~Courier New~
