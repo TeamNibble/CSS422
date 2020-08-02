@@ -11,22 +11,53 @@ START:                  ; first instruction of program
 FIRST_FOUR_BITS     MOVE.W  D4,D5   *Move the instruction to decode
                     LSR.W   #8,D5   *Shift right 8 bits to get the first four bits
                     LSR.W   #4,D5   *Shift again to access first 4 bits
-                    CMPI.B  #$00,D5 *If first 4 bits = 0000
-                    BEQ     IS_0000
+*                    CMPI.B  #$00,D5 *If first 4 bits = 0000
+*                    BEQ     IS_0000
                     CMPI.B  #$01,D5 *If first 4 bits = 0001
                     BEQ     IS_0001
                     CMPI.B  #$02,D5 *If first 4 bits = 0010
-                    BEQ     IS_0010 
-                    CMPI.B  #$04,D5 *If first 4 bits = 0010
+                    BEQ     IS_0010
+                    CMPI.B  #$03,D5 *If first 4 bits = 0011
+                    BEQ     IS_0011  
+                    CMPI.B  #$04,D5 *If first 4 bits = 0100
                     BEQ     IS_0100
                     CMPI.B  #$06,D5 *If first 4 bits = 0110
                     BEQ     IS_0110
-IS_0000
+*IS_0000
 
-IS_0001
+*-----------------------------------------------------
+*First four bits are equal to 0001 - prompt MOVE (byte)
+*-----------------------------------------------------
+IS_0001 
+            JSR BIT876          *Looks at mode for move
+            CMPI.B  #$00,D5     *If next 3 bits = 000
+            BEQ     MODE_000
+            *do not look at 1 since it is not valid
+            CMPI.B  #$02,D5     *If next 3 bits = 010
+            BEQ     IS_0011
+            CMPI.B  #$03,D5     *If next 3 bits = 011
+            BEQ     IS_0011  
+            CMPI.B  #$04,D5     *If next 3 bits = 100
+            BEQ     IS_0100
+            CMPI.B  #$05,D5     *If next 3 bits = 101
+            BEQ     IS_0110
+            CMPI.B  #$06,D5     *If next 3 bits = 110
+            BEQ     IS_0110
+            CMPI.B  #$07,D5     *If next 3 bits = 111
+            BEQ     IS_0110
+            
 
+*-----------------------------------------------------
+*First four bits are equal to 0010 - prompt MOVE
+*-----------------------------------------------------
 IS_0010
-   
+
+*-----------------------------------------------------
+*First four bits are equal to 0011 - prompt MOVE
+*-----------------------------------------------------
+IS_0011
+
+
 IS_0100     MOVE.W  D4,D5       *Move the instruction to decode
             BTST.L  #$08,D5     *Test the 8th bit for LEA
             BNE     OPCODE_LEA  *If the 8th bit = 1 -> It's LEA
@@ -72,53 +103,58 @@ GET_EA      MOVE.W  D4,D5       *Move the instruction to decode
             LSR.B   #4,D5
             CMPI.B  #$3,D5      *Check for the mode
             BEQ     MODE_000    
+
+*-----------------------------------------------------
+*Handles the mode for data register - 
+*-----------------------------------------------------       
+MODE_000    JSR BIT876
             
-MODE_000
+            
 
 *-----------------------------------------------------
 *First four bits are equal to 1101 - prompt add
 *-----------------------------------------------------
-OPCODE_ADD  MOVE.B  #$41, (A2)+  *Move char A
-            MOVE.B  #$44, (A2)+  *Move char D
-            MOVE.B  #$44, (A2)+  *Move char D
-            JSR     BIT8910      *Code to get bit 8 9 and 10 into D5
+OPCODE_ADD  MOVE.B  #$41, (A2)+     *Move char A
+            MOVE.B  #$44, (A2)+     *Move char D
+            MOVE.B  #$44, (A2)+     *Move char D
+            JSR     BIT876          *Jump to check OPMODE
 
 *-----------------------------------------------------
-*Bit shifting to access bits 5, 6, 7 from left of word
+*Bit shifting to access bits 11, 10, 9
 *-----------------------------------------------------
-BIT567  MOVE.W  D4, D5
-        LSL.W   #4, D5  *Drops first 4 bits
-        LSR.W   #8, D5  *Pushes to the right 8
-        LSR.W   #5, D5  *Pushes to the right 5 to finalize
-        RTS          
+BIT11109    MOVE.W  D4, D5
+            LSL.W   #4, D5      *Drops first 4 bits
+            LSR.W   #8, D5      *Pushes to the right 8
+            LSR.W   #5, D5      *Pushes to the right 5 to finalize
+            RTS          
 
 *-----------------------------------------------------
-*Bit shifting to access bits 8, 9, 10 from left of word
+*Bit shifting to access bits 8, 7, 6
 *-----------------------------------------------------
-BIT8910 MOVE.W  D4, D5
-        LSL.W   #7, D5  *Drop first 7 bits
-        LSR.W   #8, D5  *Pushes to the right 8
-        LSR.W   #5, D5  *Pushes to the right 5 to finalize
-        RTS
+BIT876      MOVE.W  D4, D5
+            LSL.W   #7, D5      *Drop first 7 bits
+            LSR.W   #8, D5      *Pushes to the right 8
+            LSR.W   #5, D5      *Pushes to the right 5 to finalize
+            RTS
 
 *-----------------------------------------------------
-*Bit shifting to access bits 11, 12, 13 from left of word
+*Bit shifting to access bits 5, 4, 3
 *-----------------------------------------------------
-BIT111213   MOVE.W  D4, D5
-            LSL.W   #8, D5  *Drop first 8 bits
-            LSL.W   #2, D5  *Drop 10th bit
-            LSR.W   #8, D5  *Pushes to the right 8
-            LSR.W   #5, D5  *Pushes to the right 5 to finalize
+BIT543      MOVE.W  D4, D5
+            LSL.W   #8, D5      *Drop first 8 bits
+            LSL.W   #2, D5      *Drop 10th bit
+            LSR.W   #8, D5      *Pushes to the right 8
+            LSR.W   #5, D5      *Pushes to the right 5 to finalize
             RTS 
 
 *-----------------------------------------------------
-*Bit shifting to access bits 14, 15, 16 from left of word
+*Bit shifting to access bits 2, 1, 0
 *-----------------------------------------------------
-BIT141516   MOVE.W  D4, D5
-            LSL.W   #8, D5  *Drop first 8 bits
-            LSL.W   #5, D5  *Drop 13th bit
-            LSR.W   #8, D5  *Pushes to the right 8
-            LSR.W   #5, D5  *Pushes to the right 5 to finalize
+BIT210      MOVE.W  D4, D5
+            LSL.W   #8, D5      *Drop first 8 bits
+            LSL.W   #5, D5      *Drop 13th bit
+            LSR.W   #8, D5      *Pushes to the right 8
+            LSR.W   #5, D5      *Pushes to the right 5 to finalize
             RTS 
             
 OPCODE_NOT
@@ -132,6 +168,7 @@ OPCODE_RTS
 * Put variables and constants here
 
     END    START        ; last line of source
+
 
 
 
