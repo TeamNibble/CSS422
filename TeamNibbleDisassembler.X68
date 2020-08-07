@@ -8,11 +8,97 @@
 START:                  ; first instruction of program
 
 * Put program code here
+                    LEA     stackPointer,SP *Load stack address to the stack pointer
+
+GET_INPUT           MOVE.B  #13,D0
+                    LEA     PromptMess1     *Get the starting address
+                    TRAP    #15
+                    MOVE.B  #2,D0
+                    TRAP    #15
+                    JSR     TO_HEX          *Convert it to hex
+                    BSR     CHECK_ADDRESS   *Check for valid address
+                    BSR     READ_ADDRESS
+                    MOVE.L  A0,A2           *Store the starting address in A2
+
+                    MOVE.B  #13,D0          *Get the ending address
+                    LEA     PromptMess2
+                    TRAP    #15
+                    MOVE.B  #2,D0
+                    TRAP    #15
+                    JSR     TO_HEX          *Convert it to hex
+                    BSR     CHECK_ADDRESS   *Check for valid address
+                    BRA     READ_ADDRESS
+
+*-----------------------------------------------------
+*Check for out-of-range address.
+*-----------------------------------------------------                   
+CHECK_ADDRESS       CMPI.L  #$00FFFFFF,A0
+                    BGT     INVALID_ADDRESS
+                    RTS  
+
+INVALID_ADDRESS     LEA     InvalidMess,A1
+                    MOVE.B  #13,D0
+                    TRAP    #15
+                    BRA     GET_INPUT
+
+*-----------------------------------------------------
+*Convert the current string to appropriate hex values.
+*D2: stores the current char from the user's input.
+*D3: stores the temperary converted address.
+*A0: stores the final converted address.
+*-----------------------------------------------------
+START_CONVERT       MOVEM.L D2-D3,-(SP)
+                    CLR     D2      *Clear the registers
+                    CLR     D3
+                    CLR     D4
+                    CLR     A0
+
+TO_HEX              MOVE.B  (A1)+,D2
+                    CMPI.B  #$30,D2         *If less than $30 -> error
+                    BLT     HEX_ERROR
+                    CMPI.B  #$39,D2         *If less than or equal to $39 -> convert to number
+                    BLE     NUMBER
+                    CMPI.B  #$41,D2         *If less than $41 -> error
+                    BLT     HEX_ERROR
+                    CMPI.B  #$46,D2         *If less than or equal to $46 -> convert to capital letter
+                    BLE     CAP_LETTER
+                    CMPI.B  #$67,D2         *If less than $67 -> convert to lowercase letter
+                    BLT     LOWERCASE
+                    CMPI.B  #$66,D2         *If higher than $66 -> error
+                    BGT     HEX_ERROR
+
+HEX_ERROR           LEA     ErrorMess,A1    *Print error message for invalid hex value
+                    MOVE.B  #13,D0
+                    TRAP    #15
+                    BRA     GET_INPUT       *Prompt the user to input again
+
+NUMBER              SUBI.B  #$30,D2         *Convert to number in hex
+                    ADD.B   D2,D3           *Copy it to D3
+                    BRA     CONTINUE
+
+CAP_LETTER          SUBI.B  #$37,D2         *Convert to capital letter in hex
+                    ADD.B   D2,D3           *Copy it to D3
+                    BRA     CONTINUE
+
+LOWERCASE           SUBI.B  #$57,D2         *Convert to capital letter in hex
+                    ADD.B   D2,D3           *Copy it to D3
+                    BRA     CONTINUE
+
+CONTINUE            CMPI.W  #0,D1           *If the length of string = 0
+                    BEQ     DONE_CONVERT
+                    CMPI.B  #$0,(A1)        *If we get null terminator
+                    BEQ     DONE_CONVERT
+                    LSL.L   #4,D3           *Shift left 4 bits to store later values.
+                    SUBI.W  #1,D1           *--length of string
+                    BRA     TO_HEX          *Start another loop
+
+DONE_CONVERT        MOVE.L  D3,A0           *Move the converted address to A0
+                    MOVEM.L (SP)+,D2-D3        
+
+READ_ADDRESS        
 FIRST_FOUR_BITS     MOVE.W  D4,D5   *Move the instruction to decode
                     LSR.W   #8,D5   *Shift right 8 bits to get the first four bits
                     LSR.W   #4,D5   *Shift again to access first 4 bits
-*                    CMPI.B  #$00,D5 *If first 4 bits = 0000
-*                    BEQ     IS_0000
                     CMPI.B  #$01,D5 *If first 4 bits = 0001
                     BEQ     IS_0001
                     CMPI.B  #$02,D5 *If first 4 bits = 0010
@@ -23,7 +109,6 @@ FIRST_FOUR_BITS     MOVE.W  D4,D5   *Move the instruction to decode
                     BEQ     IS_0100
                     CMPI.B  #$06,D5 *If first 4 bits = 0110
                     BEQ     IS_0110
-*IS_0000
 
 *-----------------------------------------------------
 *First four bits are equal to 0001 - prompt MOVE (byte)
@@ -157,16 +242,25 @@ BIT210      MOVE.W  D4, D5
             LSR.W   #5, D5      *Pushes to the right 5 to finalize
             RTS 
             
-OPCODE_NOT
+OPCODE_NOT  JSR BIT543
+            JSR GET_EA
 
-OPCODE_NOP
+OPCODE_NOP  MOVE.B  #$4E,(A1)+
+            MOVE.B  #$4F,(A1)+
+            MOVE.B  #$50,(A1)+
 
-OPCODE_RTS   
+
+OPCODE_RTS  MOVE.B  #$52,(A1)+
+            MOVE.B  #$54,(A1)+
+            MOVE.B  #$53,(A1)+   
 
     SIMHALT             ; halt simulator
 
 * Put variables and constants here
-
+PromptMess1  DC.B    'Please enter a starting address:',0
+PromptMess2  DC.B    'Please enter an ending address:',0
+InvalidMess  DC.B    'Error! The entered address is invalid!',0
+ErrorMess    DC.B    'Error! Invalid input!',0
     END    START        ; last line of source
 
 
