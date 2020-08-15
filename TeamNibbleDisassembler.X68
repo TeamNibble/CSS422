@@ -147,6 +147,7 @@ IS_0010     MOVE.B  #$4C,(A2)+  *Move char L
 *-----------------------------------------------------
 IS_0011     MOVE.B  #$57,(A2)+  *Move char W
             MOVE.B  #$9,(A2)+  *Tab over
+            
 
 *-----------------------------------------------------
 *First four bits are equal to 0100 - 
@@ -290,12 +291,20 @@ MOVESIZE    MOVE.B  #$4D,(A2)+  *Move char M
             MOVE.B  #$56,(A2)+  *Move char V
             MOVE.B  #$45,(A2)+  *Move char E
             MOVE.B  #$2E,(A2)+  *Move char .
-            CMPI.B  #$01,D5 *If first 4 bits = 0001 - Byte
+            MOVEM.L D0-D7/A0-A6, -(SP)
+            
+            
+            CMPI.B  #$01,D5     *If first 4 bits = 0001 - Byte
             BEQ     IS_0001
-            CMPI.B  #$02,D5 *If first 4 bits = 0010 - Word
+            CMPI.B  #$03,D5     *If first 4 bits = 0011 - Word
+            BEQ     IS_0011
+            CMPI.B  #$02,D5     *If first 4 bits = 0010 - Long
             BEQ     IS_0010
-            CMPI.B  #$03,D5 *If first 4 bits = 0011 - Long
-            BEQ     IS_0011 
+            JSR     BIT876
+            MOVE.B  D5, DestRegMo
+            
+            LEA     stackPointer, SP    *how to reset our stack pointer 
+            MOVE.L  CurAddr, DestAddr
 
 *-----------------------------------------------------
 *Jump table for OP-Mode source size code when bits 876 can be B W L
@@ -364,11 +373,15 @@ PromptMess1 DC.B    'Please enter a starting address:',0
 PromptMess2 DC.B    'Please enter an ending address:',0
 InvalidMess DC.B    'Error! The entered address is invalid!',0
 ErrorMess   DC.B    'Error! Invalid input!',0
+
 OpSize      DS.B    1
 DnRegNum    DS.B    1
+DnRegMo     DS.B    1
 EAMODE      DS.B    1
 EAReg       DS.B    1
 BitLen      DS.B    1
+CurVal      DS.L    1
+DestAddr    DS.L    1
 
     END    START        ; last line of source
 
