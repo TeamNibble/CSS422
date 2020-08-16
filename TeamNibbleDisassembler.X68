@@ -53,7 +53,7 @@ START_CONVERT       MOVEM.L D2-D3,-(SP)
                     CLR     D2      *Clear the registers
                     CLR     D3
                     CLR     D4
-                    CLR     A0
+                    *CLR     A0
 
 TO_HEX              MOVE.B  (A1)+,D2
                     CMPI.B  #$30,D2         *If less than $30 -> error
@@ -225,6 +225,7 @@ IS_1101     MOVE.B  #$41, (A2)+     *Move char A
             JSR     BIT210
             MOVE.B  D5, EAReg       *Holds value for registery
             JSR     BIT876          *Jump to get OPMODE bits
+            MULU    #6, D5          *Form offset
             MOVE.B  D5, OpSize      *move OPMODE size to variable         
             LEA     BWLOPM, A3      *Load OPMODE jump table
             JSR     0(A3, OpSize)       
@@ -382,8 +383,11 @@ EAReg       DS.B    1
 BitLen      DS.B    1
 CurVal      DS.L    1
 DestAddr    DS.L    1
+InstructL   DS.B    1   *This holds the length of how many bits current instruction holds
+InstructSeg DS.B    1   *This holds the size of the first segment of bits to read from instruction
 
     END    START        ; last line of source
+
 
 
 
