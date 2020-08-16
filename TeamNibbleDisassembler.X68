@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 *-----------------------------------------------------------
 * Title      :Disassembler Project
 * Written by :Anthony Luong, Jonathan Young, Lucas Buckeye, Uyen Minh Hoang
@@ -420,3 +421,400 @@ ErrorMess    DC.B    'Error! Invalid input!',0
 *~Font size~10~
 *~Tab type~1~
 *~Tab size~4~
+=======
+*-----------------------------------------------------------
+* Title      :Disassembler Project
+* Written by :Anthony Luong, Jonathan Young, Lucas Buckeye, Uyen Minh Hoang
+* Date       :7/11/2020
+* Description:Team Nibble's CSS422 Disasembler Project
+*-----------------------------------------------------------
+    
+stackPointer    EQU $0FFF
+                    ORG    $1000
+START:                  ; first instruction of program
+
+* Put program code here
+                    LEA     stackPointer,SP *Load stack address to the stack pointer
+
+GET_INPUT           MOVE.B  #13,D0
+                    LEA     PromptMess1, A1 *Get the starting address
+                    TRAP    #15
+                    MOVE.B  #2,D0
+                    TRAP    #15
+                    JSR     TO_HEX          *Convert it to hex
+                    BSR     CHECK_ADDRESS   *Check for valid address
+                    BSR     READ_ADDRESS
+                    MOVE.L  A0,A2           *Store the starting address in A2
+
+                    MOVE.B  #13,D0          *Get the ending address
+                    LEA     PromptMess2, A1
+                    TRAP    #15
+                    MOVE.B  #2,D0
+                    TRAP    #15
+                    JSR     TO_HEX          *Convert it to hex
+                    BSR     CHECK_ADDRESS   *Check for valid address
+                    BRA     READ_ADDRESS
+
+*-----------------------------------------------------
+*Check for out-of-range address.
+*-----------------------------------------------------                   
+CHECK_ADDRESS       CMPI.L  #$00FFFFFF,A0
+                    BGT     INVALID_ADDRESS
+                    RTS  
+
+INVALID_ADDRESS     LEA     InvalidMess,A1
+                    MOVE.B  #13,D0
+                    TRAP    #15
+                    BRA     GET_INPUT
+
+*-----------------------------------------------------
+*Convert the current string to appropriate hex values.
+*D2: stores the current char from the user's input.
+*D3: stores the temperary converted address.
+*A0: stores the final converted address.
+*-----------------------------------------------------
+START_CONVERT       MOVEM.L D2-D3,-(SP)
+                    CLR     D2      *Clear the registers
+                    CLR     D3
+                    CLR     D4
+                    CLR     A0
+
+TO_HEX              MOVE.B  (A1)+,D2
+                    CMPI.B  #$30,D2         *If less than $30 -> error
+                    BLT     HEX_ERROR
+                    CMPI.B  #$39,D2         *If less than or equal to $39 -> convert to number
+                    BLE     NUMBER
+                    CMPI.B  #$41,D2         *If less than $41 -> error
+                    BLT     HEX_ERROR
+                    CMPI.B  #$46,D2         *If less than or equal to $46 -> convert to capital letter
+                    BLE     CAP_LETTER
+                    CMPI.B  #$67,D2         *If less than $67 -> convert to lowercase letter
+                    BLT     LOWERCASE
+                    CMPI.B  #$66,D2         *If higher than $66 -> error
+                    BGT     HEX_ERROR
+
+HEX_ERROR           LEA     ErrorMess,A1    *Print error message for invalid hex value
+                    MOVE.B  #13,D0
+                    TRAP    #15
+                    BRA     GET_INPUT       *Prompt the user to input again
+
+NUMBER              SUBI.B  #$30,D2         *Convert to number in hex
+                    ADD.B   D2,D3           *Copy it to D3
+                    BRA     CONTINUE
+
+CAP_LETTER          SUBI.B  #$37,D2         *Convert to capital letter in hex
+                    ADD.B   D2,D3           *Copy it to D3
+                    BRA     CONTINUE
+
+LOWERCASE           SUBI.B  #$57,D2         *Convert to capital letter in hex
+                    ADD.B   D2,D3           *Copy it to D3
+                    BRA     CONTINUE
+
+CONTINUE            CMPI.W  #0,D1           *If the length of string = 0
+                    BEQ     DONE_CONVERT
+                    CMPI.B  #$0,(A1)        *If we get null terminator
+                    BEQ     DONE_CONVERT
+                    LSL.L   #4,D3           *Shift left 4 bits to store later values.
+                    SUBI.W  #1,D1           *--length of string
+                    BRA     TO_HEX          *Start another loop
+
+DONE_CONVERT        MOVE.L  D3,A0           *Move the converted address to A0
+                    MOVEM.L (SP)+,D2-D3        
+
+READ_ADDRESS
+        
+FIRST_FOUR_BITS     MOVE.W  D4,D5   *Move the instruction to decode
+                    LSR.W   #8,D5   *Shift right 8 bits to get the first four bits
+                    LSR.W   #4,D5   *Shift again to access first 4 bits
+                    CMPI.B  #$00,D5 *If first 4 bits = 0000 error
+                    BEQ     HEX_ERROR
+                    CMPI.B  #$04,D5 *If first 4 bits = Less than 4
+                    BLT     MOVESIZE 
+                    CMPI.B  #$04,D5 *If first 4 bits = 0100
+                    BEQ     IS_0100
+                    CMPI.B  #$06,D5 *If first 4 bits = 0110
+                    BEQ     IS_0110
+                    CMPI.B  #$13,D5 *If first 4 bits = 1101 (13-ADD)
+                    BEQ     IS_1101
+
+*-----------------------------------------------------
+*First four bits are equal to 0001 - prompt MOVE (Byte)
+*-----------------------------------------------------
+IS_0001     MOVE.B  #$42,(A2)+  *Move char B
+            MOVE.B  #$9,(A2)+  *Tab over
+            JSR BIT876          *Looks at mode for move
+            CMPI.B  #$00,D5     *If next 3 bits = 000
+            BEQ     MODE_000
+            *do not look at 1 since it is not valid
+            CMPI.B  #$02,D5     *If next 3 bits = 010
+            BEQ     IS_0011
+            CMPI.B  #$03,D5     *If next 3 bits = 011
+            BEQ     IS_0011  
+            CMPI.B  #$04,D5     *If next 3 bits = 100
+            BEQ     IS_0100
+            CMPI.B  #$05,D5     *If next 3 bits = 101
+            BEQ     IS_0110
+            CMPI.B  #$06,D5     *If next 3 bits = 110
+            BEQ     IS_0110
+            CMPI.B  #$07,D5     *If next 3 bits = 111
+            BEQ     IS_0110
+            
+
+*-----------------------------------------------------
+*First four bits are equal to 0010 - prompt MOVE (Long)
+*-----------------------------------------------------
+IS_0010     MOVE.B  #$4C,(A2)+  *Move char L
+            MOVE.B  #$9,(A2)+  *Tab over
+
+*-----------------------------------------------------
+*First four bits are equal to 0011 - prompt MOVE (Word)
+*-----------------------------------------------------
+IS_0011     MOVE.B  #$57,(A2)+  *Move char W
+            MOVE.B  #$9,(A2)+  *Tab over
+            
+
+*-----------------------------------------------------
+*First four bits are equal to 0100 - 
+*Possible OP-Codes:MOVEM, NOP, JSR, RTS, LEA, NOT, MULS.L, DIVU.L
+*-----------------------------------------------------
+IS_0100     MOVE.W  D4,D5       *Move the instruction to decode
+            BTST.L  #$08,D5     *Test the 8th bit for LEA
+            BNE     OPCODE_LEA  *If the 8th bit = 1 -> It's LEA
+            LSR.W   #8,D5       *Shift to get the second four bits
+            LSL.B   #4,D5
+            LSR     #4,D5
+            CMPI.B  #$E,D5      *It's either NOP, JSR, or RTS
+            BEQ     DECODE_4E
+            CMPI.B  #$C,D5      *Its's either MULS.L, DIVU.L
+            BEQ     DECODE_4C   
+            CMPI.B  #$06,D5     *It's NOT
+            BEQ     OPCODE_NOT  
+
+DECODE_4C
+            
+DECODE_4E   MOVE.W  D4,D5
+            CMPI.W  #$4E71,D5   *Check for NOP
+            BEQ     OPCODE_NOP
+            CMPI.W  #$4E75,D5   *Check for RTS
+            BEQ     OPCODE_RTS
+            
+            
+OPCODE_LEA  MOVE.B  #$4C,(A2)+  *Move char L
+            MOVE.B  #$45,(A2)+  *Move char E
+            MOVE.B  #$41,(A2)+  *Move char A
+            BRA     GET_EA      *Decode EA
+
+*-----------------------------------------------------
+*First four bits are equal to 0110 - 
+*Possible OP-Codes:Bcc, BRA
+*-----------------------------------------------------
+IS_0110     MOVE.W  D4,D5
+            LSR.W   #8,D5
+            CMPI.B  #$60,D5     *Check for BRA
+            BEQ     OPCODE_BRA  
+
+OPCODE_BRA  MOVE.B  #$42,(A2)+  *Move char B
+            MOVE.B  #$52,(A2)+  *Move char R
+            MOVE.B  #$41,(A2)+  *Move char A
+            MOVE.W  D4,D5       
+            ADD.W   (A2),D5     *<PC> + Displacement
+            
+           
+GET_EA      MOVE.W  D4,D5       *Move the instruction to decode
+            LSR.B   #3,D5       *Shift to get the mode
+            LSL.B   #4,D5
+            LSR.B   #4,D5
+            CMPI.B  #$3,D5      *Check for the mode
+            BEQ     MODE_000    
+
+*-----------------------------------------------------
+*Handles the mode for data register - 
+*-----------------------------------------------------       
+MODE_000    JSR BIT876
+            
+            
+
+*-----------------------------------------------------
+*First four bits are equal to 1101 - prompt add
+*-----------------------------------------------------
+IS_1101     MOVE.B  #$41, (A2)+     *Move char A
+            MOVE.B  #$44, (A2)+     *Move char D
+            MOVE.B  #$44, (A2)+     *Move char D
+            MOVE.B  #$2E, (A2)+     *Move char .
+            MOVEM.L D0-D7/A0-A6, -(SP) 
+            JSR     BIT111009
+            MOVE.B  D5, DnRegNum    *Holds value for Dn#
+            JSR     BIT543
+            MOVE.B  D5, EAMODE      *Holds Destination Mode
+            JSR     BIT210
+            MOVE.B  D5, EAReg       *Holds value for registery
+            JSR     BIT876          *Jump to get OPMODE bits
+            MOVE.B  D5, OpSize      *move OPMODE size to variable         
+            LEA     BWLOPM, A3      *Load OPMODE jump table
+            JSR     0(A3, OpSize)       
+
+*-----------------------------------------------------
+*Bit shifting to access bits 11, 10, 9
+*-----------------------------------------------------
+BIT11109    CLR.L   D5
+            MOVE.W  D4, D5
+            LSL.W   #4, D5      *Drops first 4 bits
+            LSR.W   #8, D5      *Pushes to the right 8
+            LSR.W   #5, D5      *Pushes to the right 5 to finalize
+            RTS          
+
+*-----------------------------------------------------
+*Bit shifting to access bits 8, 7, 6
+*-----------------------------------------------------
+BIT876      CLR.L   D5
+            MOVE.W  D4, D5
+            LSL.W   #7, D5      *Drop first 7 bits
+            LSR.W   #8, D5      *Pushes to the right 8
+            LSR.W   #5, D5      *Pushes to the right 5 to finalize
+            RTS
+
+*-----------------------------------------------------
+*Bit shifting to access bits 5, 4, 3
+*-----------------------------------------------------
+BIT543      CLR.L   D5
+            MOVE.W  D4, D5
+            LSL.W   #8, D5      *Drop first 8 bits
+            LSL.W   #2, D5      *Drop 10th bit
+            LSR.W   #8, D5      *Pushes to the right 8
+            LSR.W   #5, D5      *Pushes to the right 5 to finalize
+            RTS 
+
+*-----------------------------------------------------
+*Bit shifting to access bits 2, 1, 0
+*-----------------------------------------------------
+BIT210      CLR.L   D5
+            MOVE.W  D4, D5
+            LSL.W   #8, D5      *Drop first 8 bits
+            LSL.W   #5, D5      *Drop 13th bit
+            LSR.W   #8, D5      *Pushes to the right 8
+            LSR.W   #5, D5      *Pushes to the right 5 to finalize
+            RTS 
+            
+OPCODE_NOT  JSR BIT543
+            JSR GET_EA
+
+OPCODE_NOP  MOVE.B  #$4E,(A1)+  *Move char N
+            MOVE.B  #$4F,(A1)+  *Move char O
+            MOVE.B  #$50,(A1)+  *Move char P
+
+
+OPCODE_RTS  MOVE.B  #$52,(A1)+  *Move char R
+            MOVE.B  #$54,(A1)+  *Move char T
+            MOVE.B  #$53,(A1)+  *Move char S
+
+*-----------------------------------------------------
+*Op-code move size manager - first four bits are 01(B), 11(W), 10(L)
+*-----------------------------------------------------
+MOVESIZE    MOVE.B  #$4D,(A2)+  *Move char M
+            MOVE.B  #$4F,(A2)+  *Move char O
+            MOVE.B  #$56,(A2)+  *Move char V
+            MOVE.B  #$45,(A2)+  *Move char E
+            MOVE.B  #$2E,(A2)+  *Move char .
+            MOVEM.L D0-D7/A0-A6, -(SP)
+            
+            
+            CMPI.B  #$01,D5     *If first 4 bits = 0001 - Byte
+            BEQ     IS_0001
+            CMPI.B  #$03,D5     *If first 4 bits = 0011 - Word
+            BEQ     IS_0011
+            CMPI.B  #$02,D5     *If first 4 bits = 0010 - Long
+            BEQ     IS_0010
+            JSR     BIT876
+            MOVE.B  D5, DestRegMo
+            
+            LEA     stackPointer, SP    *how to reset our stack pointer 
+            MOVE.L  CurAddr, DestAddr
+
+*-----------------------------------------------------
+*Jump table for OP-Mode source size code when bits 876 can be B W L
+* Works for SUB, AND, and ADD
+*-----------------------------------------------------
+BWLOPM      
+            *000 - 010 = <ea> + Dn -> Dn
+            JMP     OM000    *Byte 
+            JMP     OM001    *Word 
+            JMP     OM010    *Long
+            JMP     OM011    *Not a valid OP-Mode code
+            *100 - 110 = Dn + <ea> -> <ea>
+            JMP     OM100    *Byte
+            JMP     OM101    *Word
+            JMP     OM110    *Long
+            *for word or long addressing mode
+            *JMP     876OM111   *Not a valid OP-Mode code
+OPMRET      RTS
+
+*-----------------------------------------------------
+*OP-Mode when destination is Dn
+* Works for SUB, AND, and ADD
+*-----------------------------------------------------
+OM000   MOVE.B  #$42,(A2)+  *Move char B
+        MOVE.B  #8, BitLen
+        JSR    OPMRET   
+
+OM001   MOVE.B  #$57,(A2)+  *Move char W
+        MOVE.B  #16, BitLen
+        JSR    OPMRET
+
+OM010   MOVE.B  #$4C,(A2)+  *Move char L
+        MOVE.B  #32, BitLen
+        JSR    OPMRET
+
+*-----------------------------------------------------
+*Bad OP mode for table
+*-----------------------------------------------------
+OM011
+
+*-----------------------------------------------------
+*OP-Mode when destination is ea, source is Dn
+* Works for SUB, AND, and ADD
+*-----------------------------------------------------
+OM100   MOVE.B  #$42,(A2)+  *Move char B
+        MOVE.B  #8, BitLen
+        JSR    OPMRET
+
+
+OM101   MOVE.B  #$57,(A2)+  *Move char W
+        MOVE.B  #16, BitLen
+        JSR    OPMRET
+
+
+OM110   MOVE.B  #$4C,(A2)+  *Move char L
+        MOVE.B  #32, BitLen
+        JSR    OPMRET
+
+
+
+
+    SIMHALT             ; halt simulator
+
+* Put variables and constants here
+PromptMess1 DC.B    'Please enter a starting address:',0
+PromptMess2 DC.B    'Please enter an ending address:',0
+InvalidMess DC.B    'Error! The entered address is invalid!',0
+ErrorMess   DC.B    'Error! Invalid input!',0
+
+OpSize      DS.B    1
+DnRegNum    DS.B    1
+DnRegMo     DS.B    1
+EAMODE      DS.B    1
+EAReg       DS.B    1
+BitLen      DS.B    1
+CurVal      DS.L    1
+DestAddr    DS.L    1
+
+    END    START        ; last line of source
+
+
+
+
+
+*~Font name~Courier New~
+*~Font size~10~
+*~Tab type~1~
+*~Tab size~4~
+>>>>>>> bad8a6dd54c7e40cb4fb4ef88ce8a48b223dc82f
