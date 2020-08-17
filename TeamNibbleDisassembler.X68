@@ -180,6 +180,7 @@ DECODE_4E   MOVE.W  D4,D5
 OPCODE_LEA  MOVE.B  #$4C,(A1)+  *Move char L
             MOVE.B  #$45,(A1)+  *Move char E
             MOVE.B  #$41,(A1)+  *Move char A
+            MOVE.B  #$9, (A1)+  *Tab over
             BRA     GET_EA      *Decode EA
 
 *-----------------------------------------------------
@@ -525,6 +526,7 @@ InstructL   DS.B    1   *This holds the length of how many bits current instruct
 InstructSeg DS.B    1   *This holds the size of the first segment of bits to read from instruction
 
     END    START        ; last line of source
+
 
 
 
