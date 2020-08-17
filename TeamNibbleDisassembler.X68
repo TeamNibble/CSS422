@@ -264,7 +264,7 @@ IS_1101     MOVE.B  #$41, (A2)+     *Move char A
             MOVE.B  #$44, (A2)+     *Move char D
             MOVE.B  #$2E, (A2)+     *Move char .
             MOVEM.L D0-D7/A0-A6, -(SP) 
-            JSR     BIT111009
+            JSR     BIT11109
             MOVE.B  D5, DnRegNum    *Holds value for Dn#
             JSR     BIT543
             MOVE.B  D5, EAMODE      *Holds Destination Mode
@@ -274,7 +274,7 @@ IS_1101     MOVE.B  #$41, (A2)+     *Move char A
             MULU    #6, D5          *Form offset
             MOVE.B  D5, OpSize      *move OPMODE size to variable         
             LEA     BWLOPM, A3      *Load OPMODE jump table
-            JSR     0(A3, OpSize)   
+            JSR     0(A3, D5)   
 
 *-----------------------------------------------------
 *Bit shifting to access bits 11, 10, 9
@@ -332,6 +332,29 @@ OPCODE_NOP  MOVE.B  #$4E,(A1)+
 OPCODE_RTS  MOVE.B  #$52,(A1)+
             MOVE.B  #$54,(A1)+
             MOVE.B  #$53,(A1)+   
+
+*-----------------------------------------------------	
+*Op-code move size manager - first four bits are 01(B), 11(W), 10(L)	
+*-----------------------------------------------------	
+MOVESIZE    MOVE.B  #$4D,(A2)+  *Move char M	
+            MOVE.B  #$4F,(A2)+  *Move char O	
+            MOVE.B  #$56,(A2)+  *Move char V	
+            MOVE.B  #$45,(A2)+  *Move char E	
+            MOVE.B  #$2E,(A2)+  *Move char .	
+            MOVEM.L D0-D7/A0-A6, -(SP)	
+
+
+            CMPI.B  #$01,D5     *If first 4 bits = 0001 - Byte	
+            BEQ     IS_0001	
+            CMPI.B  #$03,D5     *If first 4 bits = 0011 - Word	
+            BEQ     IS_0011	
+            CMPI.B  #$02,D5     *If first 4 bits = 0010 - Long	
+            BEQ     IS_0010	
+            JSR     BIT876	
+            MOVE.B  D5, DestRegNo	
+
+            LEA     stackPointer, SP    *how to reset our stack pointer 	
+            MOVE.L  CurAddr, DestAddr
             
 *-----------------------------------------------------
 *Jump table for OP-Mode source size code when bits 876 can be B W L
@@ -490,16 +513,19 @@ ErrorMess    DC.B    'Error! Invalid input!',0
 
 OpSize      DS.B    1
 DnRegNum    DS.B    1
-DnRegMo     DS.B    1
+DnRegNo     DS.B    1
+DestRegNo   DS.B    1
 EAMODE      DS.B    1
 EAReg       DS.B    1
 BitLen      DS.B    1
 CurVal      DS.L    1
+CurAddr     DS.L    1
 DestAddr    DS.L    1
 InstructL   DS.B    1   *This holds the length of how many bits current instruction holds
 InstructSeg DS.B    1   *This holds the size of the first segment of bits to read from instruction
 
     END    START        ; last line of source
+
 
 
 
