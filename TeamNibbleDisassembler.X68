@@ -21,6 +21,7 @@ GET_INPUT           MOVE.B  #13,D0
                     JSR     TO_HEX          *Convert it to hex
                     BSR     CHECK_ADDRESS   *Check for valid address
                     MOVEA.L A0,A5           *Store the starting address in A5
+                    MOVEA   A2,CurrentAddress *Copies the staring address to the address tracker 
                     
                     MOVE.B  #13,D0          *Get the ending address
                     LEA     PromptMess2, A1
@@ -108,8 +109,15 @@ TO_HEX              MOVE.B  (A1)+,D2
                     BGT     HEX_ERROR
 
 HEX_ERROR           LEA     ErrorMess,A1    *Print error message for invalid hex value
+                    MOVE.B  #14,D0
+                    TRAP    #15
+                    MOVE.L  CurrentAddress, D1 * Move address into D1 to output
+                    MOVE.B  #3,D0 * Display signed number in D1 in decimal. 
+                    TRAP    #15   * Print out invalid address
+                    LEA     NewLine, A1 *Create new line
                     MOVE.B  #13,D0
                     TRAP    #15
+                    ADD.W  #$2, CurentAddress *Increment by Word Value for invalid opcode
                     BRA     GET_INPUT       *Prompt the user to input again
                     
 NUMBER              SUBI.B  #$30,D2         *Convert to number in hex
@@ -165,6 +173,7 @@ FIRST_FOUR_BITS     MOVE.W  D4,D5   *Move the instruction to decode
                     BEQ     IS_0110
                     CMPI.B  #$13,D5 *If first 4 bits = 1101 (13-ADD)
                     BEQ     IS_1101
+                    BRA     HEX_ERROR *If none of the bits match print error
                     RTS
                     
 *-----------------------------------------------------
@@ -635,8 +644,6 @@ PromptMess2 DC.B    'Please enter an even ending address in hexadicimal format:'
 InvalidMess DC.B    'Error! The entered address is invalid!',0
 ErrorMess   DC.B    'Error! Invalid input!',0
 EnterMess   DC.B    'Press enter to continue', 0
-StartAddr   DC.L    $500
-EndAddr     DC.L    $510
 
 OutPut      DS.L    1
 OpSize      DS.B    1
@@ -646,13 +653,18 @@ EARegNum    DS.B    1
 BitLen      DS.B    1
 DestRegNum  DS.B    1
 CurVal      DS.L    1
-CurAddr     DS.L    1
 DestAddr    DS.L    1
 InstructL   DS.B    1   *This holds the length of how many bits current instruction holds
 InstructSeg DS.B    1   *This holds the size of the first segment of bits to read from instruction
 
+*Variables used for counters
+CurrentAddress DS.L 1   *This holds the current address of the instruction being read
+StartAddr      DC.L    $500 *Holds the start address of the input file
+EndAddr        DC.L    $510 *Stores the ending addres of the input file
+
 
     END    START        ; last line of source
+
 
 
 
