@@ -62,13 +62,19 @@ USERENTER           LEA     EnterMess, A1   *Lets the user know they are at the 
                     TRAP    #15
                     RTS
 
-*-----------------------------------------------------
-*Method to prompt user if they wish to continue
-*-----------------------------------------------------                    
-ENDOFFILE       *TO-DO prompts message for user with yes/no if they wish to do it again
-                *TO-DO if yes should return to start
-                *TO-DO if no should quit program
-
+*-------------------------------------------------------------------
+*Prompts user if they would like to disassemble again or end program
+*-------------------------------------------------------------------                    
+ENDOFFILE           LEA     EndOfFileMess, A1 *Asks the user if they would like to disassemble again
+                    MOVE.B  #13, D0
+                    TRAP    #15
+                    MOVE.B  #5, D0 *Read a single character from the keyboard into D1
+                    TRAP    #15
+                    CMP.B   D1, #$79 *If y is enetered restart program, else program will be terminated
+                    BEQ     GET_INPUT
+                    MOVE.B  #9, D0   *Terminate the program
+                    TRAP    #15
+                                    
 *-----------------------------------------------------
 *Check for out-of-range address.
 *-----------------------------------------------------                   
@@ -150,8 +156,8 @@ START_DISASSEMBLE   MOVE.B  (A2)+,D4    *Move the instruction to D4
                     CMP.L   A2,A3       *If we reach the ending address
                     BEQ     DONE_DISASSEMBLE    *We're done
                     JSR     FIRST_FOUR_BITS     *Start opcode decoding
-                    BRA     START_DISASSEMBLE        
-
+                    BRA     START_DISASSEMBLE
+                    
 *-----------------------------------------------------
 *Disassemble is finished- jumps back to main loop
 *-----------------------------------------------------
@@ -643,7 +649,7 @@ PromptMess1 DC.B    'Please enter an even starting address in hexadecimal format
 PromptMess2 DC.B    'Please enter an even ending address in hexadicimal format:',0
 InvalidMess DC.B    'Error! The entered address is invalid!',0
 ErrorMess   DC.B    'Error! Invalid input!',0
-EnterMess   DC.B    'Press enter to continue', 0
+EnterMess   DC.B    'Press enter to continue',0
 
 OutPut      DS.L    1
 OpSize      DS.B    1
@@ -662,8 +668,12 @@ CurrentAddress DS.L 1   *This holds the current address of the instruction being
 StartAddr      DC.L    $500 *Holds the start address of the input file
 EndAddr        DC.L    $510 *Stores the ending addres of the input file
 
+*END of Program Message
+EndOfFileMess   DC.B     'Would you like to disassemble file again? [y/n]',0
+
 
     END    START        ; last line of source
+
 
 
 
