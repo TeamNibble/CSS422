@@ -124,8 +124,8 @@ FIRST_FOUR_BITS     MOVE.W  D4,D5   *Move the instruction to decode
 *-----------------------------------------------------
 *First four bits are equal to 0001 - prompt MOVE (byte)
 *-----------------------------------------------------
-IS_0001     MOVE.B  #$42,(A2)+  *Move char B
-            MOVE.B  #$9,(A2)+  *Tab over
+IS_0001     MOVE.B  #$42,(A1)+  *Move char B
+            MOVE.B  #$9,(A1)+  *Tab over
             JSR BIT876          *Looks at mode for move
             CMPI.B  #$00,D5     *If next 3 bits = 000
             BEQ     MODE_000
@@ -147,14 +147,14 @@ IS_0001     MOVE.B  #$42,(A2)+  *Move char B
 *-----------------------------------------------------
 *First four bits are equal to 0010 - prompt MOVE
 *-----------------------------------------------------
-IS_0010     MOVE.B  #$4C,(A2)+  *Move char L
-            MOVE.B  #$9,(A2)+  *Tab over
+IS_0010     MOVE.B  #$4C,(A1)+  *Move char L
+            MOVE.B  #$9,(A1)+  *Tab over
 
 *-----------------------------------------------------
 *First four bits are equal to 0011 - prompt MOVE
 *-----------------------------------------------------
-IS_0011     MOVE.B  #$57,(A2)+  *Move char W
-            MOVE.B  #$9,(A2)+  *Tab over
+IS_0011     MOVE.B  #$57,(A1)+  *Move char W
+            MOVE.B  #$9,(A1)+  *Tab over
 
 
 IS_0100     MOVE.W  D4,D5       *Move the instruction to decode
@@ -195,6 +195,7 @@ IS_0110     MOVE.W  D4,D5
 OPCODE_BRA  MOVE.B  #$42,(A1)+  *Move char B
             MOVE.B  #$52,(A1)+  *Move char R
             MOVE.B  #$41,(A1)+  *Move char A
+            MOVE.B  #$9,(A1)+   *Tab over
             MOVE.W  D4,D5       
             ADD.W   (A2),D5     *<PC> + Displacement
             
@@ -260,22 +261,24 @@ MODE_111    JSR     BIT210              *Get the register
 *-----------------------------------------------------
 *First four bits are equal to 1101 - prompt add
 *-----------------------------------------------------
-IS_1101     MOVE.B  #$41, (A2)+     *Move char A
-            MOVE.B  #$44, (A2)+     *Move char D
-            MOVE.B  #$44, (A2)+     *Move char D
-            MOVE.B  #$2E, (A2)+     *Move char .
+IS_1101     MOVE.B  #$41, (A1)+     *Move char A
+            MOVE.B  #$44, (A1)+     *Move char D
+            MOVE.B  #$44, (A1)+     *Move char D
+            MOVE.B  #$2E, (A1)+     *Move char .
             MOVEM.L D0-D7/A0-A6, -(SP) 
             JSR     BIT11109
             MOVE.B  D5, DnRegNum    *Holds value for Dn#
             JSR     BIT543
-            MOVE.B  D5, EAMODE      *Holds Destination Mode
+            MOVE.B  D5, EAMODE      *Holds Mode for EA
             JSR     BIT210
             MOVE.B  D5, EAReg       *Holds value for registery
             JSR     BIT876          *Jump to get OPMODE bits
+            MOVE.B  D5, OpSize      *move OPMODE size to variable- This tells where Dn is
             MULU    #6, D5          *Form offset
-            MOVE.B  D5, OpSize      *move OPMODE size to variable         
             LEA     BWLOPM, A3      *Load OPMODE jump table
-            JSR     0(A3, D5)   
+            JSR     0(A3, D5)
+            CMPI.B  #3, OpSize
+            BGT     DNOut
 
 *-----------------------------------------------------
 *Bit shifting to access bits 11, 10, 9
@@ -337,11 +340,11 @@ OPCODE_RTS  MOVE.B  #$52,(A1)+
 *-----------------------------------------------------	
 *Op-code move size manager - first four bits are 01(B), 11(W), 10(L)	
 *-----------------------------------------------------	
-MOVESIZE    MOVE.B  #$4D,(A2)+  *Move char M	
-            MOVE.B  #$4F,(A2)+  *Move char O	
-            MOVE.B  #$56,(A2)+  *Move char V	
-            MOVE.B  #$45,(A2)+  *Move char E	
-            MOVE.B  #$2E,(A2)+  *Move char .	
+MOVESIZE    MOVE.B  #$4D,(A1)+  *Move char M	
+            MOVE.B  #$4F,(A1)+  *Move char O	
+            MOVE.B  #$56,(A1)+  *Move char V	
+            MOVE.B  #$45,(A1)+  *Move char E	
+            MOVE.B  #$2E,(A1)+  *Move char .	
             MOVEM.L D0-D7/A0-A6, -(SP)	
 
 
@@ -379,15 +382,18 @@ OPMRET      RTS
 *OP-Mode when destination is Dn
 * Works for SUB, AND, and ADD
 *-----------------------------------------------------
-OM000   MOVE.B  #$42,(A2)+  *Move char B
+OM000   MOVE.B  #$42,(A1)+  *Move char B
+        MOVE.B  #$9,(A1)+   *Tab over
         MOVE.B  #8, BitLen
         JSR    OPMRET   
 
-OM001   MOVE.B  #$57,(A2)+  *Move char W
+OM001   MOVE.B  #$57,(A1)+  *Move char W
+        MOVE.B  #$9,(A1)+   *Tab over
         MOVE.B  #16, BitLen
         JSR    OPMRET
 
-OM010   MOVE.B  #$4C,(A2)+  *Move char L
+OM010   MOVE.B  #$4C,(A1)+  *Move char L
+        MOVE.B  #$9,(A1)+   *Tab over
         MOVE.B  #32, BitLen
         JSR    OPMRET
 
@@ -400,19 +406,31 @@ OM011
 *OP-Mode when destination is ea, source is Dn
 * Works for SUB, AND, and ADD
 *-----------------------------------------------------
-OM100   MOVE.B  #$42,(A2)+  *Move char B
+OM100   MOVE.B  #$42,(A1)+  *Move char B
+        MOVE.B  #$9,(A1)+   *Tab over
         MOVE.B  #8, BitLen
         JSR    OPMRET
 
 
-OM101   MOVE.B  #$57,(A2)+  *Move char W
+OM101   MOVE.B  #$57,(A1)+  *Move char W
+        MOVE.B  #$9,(A1)+   *Tab over
         MOVE.B  #16, BitLen
         JSR    OPMRET
 
 
-OM110   MOVE.B  #$4C,(A2)+  *Move char L
+OM110   MOVE.B  #$4C,(A1)+  *Move char L
+        MOVE.B  #$9,(A1)+   *Tab over
         MOVE.B  #32, BitLen
         JSR    OPMRET
+        
+*-----------------------------------------------------
+*Loads Dn and Dn reg num
+*-----------------------------------------------------
+DNOut   MOVE.B  #$44, (A1)+ *Load char D
+        CLR.L   D5
+        MOVE.B  DnRegNum, D5   *move register value into D5
+        MOVE.B  D5, (A1)+
+
 
 GET_WORD_ADDRESS    MOVE.B  (A2)+,D6    *Move the address to D6 to convert to string
                     LSL.L   #$4,D6
@@ -515,7 +533,6 @@ ErrorMess    DC.B    'Error! Invalid input!',0
 OpSize      DS.B    1
 DnRegNum    DS.B    1
 DnRegNo     DS.B    1
-DestRegNo   DS.B    1
 EAMODE      DS.B    1
 EAReg       DS.B    1
 BitLen      DS.B    1
@@ -524,6 +541,7 @@ CurAddr     DS.L    1
 DestAddr    DS.L    1
 InstructL   DS.B    1   *This holds the length of how many bits current instruction holds
 InstructSeg DS.B    1   *This holds the size of the first segment of bits to read from instruction
+
 
     END    START        ; last line of source
 
