@@ -156,7 +156,12 @@ START_DISASSEMBLE   MOVE.B  (A2)+,D4    *Move the instruction to D4
                     CMP.L   A2,A3       *If we reach the ending address
                     BEQ     DONE_DISASSEMBLE    *We're done
                     JSR     FIRST_FOUR_BITS     *Start opcode decoding
-                    BRA     START_DISASSEMBLE        
+                    BRA     START_DISASSEMBLE
+                    
+*-----------------------------------------------------
+*Disassemble is finished- jumps back to main loop
+*-----------------------------------------------------
+DONE_DISASSEMBLE    *TO-DO jump back to main loop
 
 *-----------------------------------------------------
 *Reads first four bits of OP-Code instruction and branches appropriately 
@@ -668,7 +673,6 @@ EndOfFileMess   DC.B     'Would you like to disassemble file again? [y/n]',0
 
 
     END    START        ; last line of source
-
 
 
 
