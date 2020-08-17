@@ -177,7 +177,7 @@ FIRST_FOUR_BITS     MOVE.W  D4,D5   *Move the instruction to decode
                     RTS
                     
 *-----------------------------------------------------
-*First four bits are equal to 0001 - prompt MOVE (byte)
+*First four bits are equal to 0001 - prompt MOVE (Byte)
 *-----------------------------------------------------
 IS_0001     MOVE.B  #$42,(A1)+  *Move char B
             MOVE.B  #$9,(A1)+  *Tab over
@@ -201,14 +201,14 @@ IS_0001     MOVE.B  #$42,(A1)+  *Move char B
             
 
 *-----------------------------------------------------
-*First four bits are equal to 0010 - prompt MOVE
+*First four bits are equal to 0010 - prompt MOVE (Long)
 *-----------------------------------------------------
 IS_0010     MOVE.B  #$4C,(A1)+  *Move char L
             MOVE.B  #$9,(A1)+  *Tab over
             MOVE.B  D5, OpSize  *Store size of instruction
 
 *-----------------------------------------------------
-*First four bits are equal to 0011 - prompt MOVE
+*First four bits are equal to 0011 - prompt MOVE (Word)
 *-----------------------------------------------------
 IS_0011     MOVE.B  #$57,(A1)+  *Move char W
             MOVE.B  #$9,(A1)+  *Tab over
@@ -664,6 +664,7 @@ EndAddr        DC.L    $510 *Stores the ending addres of the input file
 
 
     END    START        ; last line of source
+
 
 
 
