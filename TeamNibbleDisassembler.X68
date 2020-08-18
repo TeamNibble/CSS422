@@ -39,7 +39,7 @@ GET_INPUT           MOVE.B  #13,D0
 *Main loop tracker to check screen line count and memory read end
 *-----------------------------------------------------                     
 LOOPCOUNT           *TO-DO Get instruction address address here (or call loop to do so)
-                    MOVE.B  #$24, (A1)+         *Load the '$' symbol
+                    *MOVE.B  #$24, (A1)+         *Load the '$' symbol
                     *TO-DO Print address here
                     MOVE.B  #$9,(A1)+           *Tab over
                     JSR     START_DISASSEMBLE   *Call disassemble protocol
@@ -150,17 +150,19 @@ CONTINUE            CMPI.W  #0,D1           *If the length of string = 0
                     SUBI.W  #1,D1           *--length of string
                     BRA     TO_HEX          *Start another loop
 
-DONE_CONVERT        MOVE.L  D3,A0           *Move the converted address to A0
+DONE_CONVERT        MOVE.L  #0, A0
+                    MOVE.L  D3,A0           *Move the converted address to A0
                     *MOVEM.L (SP)+,D2-D3
                     RTS        
 
-START_DISASSEMBLE   MOVE.W  (A5)+,D4    *Move the instruction to D4
+START_DISASSEMBLE   MOVE.W   (A5)+,D4    *Move the instruction to D4
                     *LSL.L   #$4,D4      *Move 4 bits for the next byte
                     *MOVE.B  (A2)+,D4    *Need to move by byte because address can be odd
-                    CMP.L   A5,A3       *If we reach the ending address
-                    BEQ     DONE_DISASSEMBLE    *We're done
+                    *CMP.L   A5,A3       *If we reach the ending address
+                    *BEQ     DONE_DISASSEMBLE    *We're done
                     JSR     FIRST_FOUR_BITS     *Start opcode decoding
-                    BRA     START_DISASSEMBLE
+                    *BRA     START_DISASSEMBLE
+                    BRA     LOOPCOUNT
                     
 *-----------------------------------------------------
 *Disassemble is finished- jumps back to main loop
@@ -196,7 +198,7 @@ FIRST_FOUR_BITS     MOVE.W  D4,D5   *Move the instruction to decode
 *-----------------------------------------------------
 *First four bits are equal to 0001 - prompt MOVE (Byte)
 *-----------------------------------------------------
-IS_0001     MOVE.B  #$42,(A1)+  *Move char B
+IS_0001     MOVE.B  #$42,(A2)+  *Move char B
             MOVE.B  #8, OpSize
             RTS
             *MOVE.B  #$9,(A1)+  *Tab over
@@ -221,7 +223,7 @@ IS_0001     MOVE.B  #$42,(A1)+  *Move char B
 *-----------------------------------------------------
 *First four bits are equal to 0010 - prompt MOVE (Long)
 *-----------------------------------------------------
-IS_0010     MOVE.B  #$4C,(A1)+  *Move char L
+IS_0010     MOVE.B  #$4C,(A2)+  *Move char L
             MOVE.B  #32, OpSize
             *MOVE.B  #$9,(A1)+  *Tab over
             *MOVE.B  D5, OpSize  *Store size of instruction
@@ -230,7 +232,7 @@ IS_0010     MOVE.B  #$4C,(A1)+  *Move char L
 *-----------------------------------------------------
 *First four bits are equal to 0011 - prompt MOVE (Word)
 *-----------------------------------------------------
-IS_0011     MOVE.B  #$57,(A1)+  *Move char W
+IS_0011     MOVE.B  #$57,(A2)+  *Move char W
             MOVE.B  #16, OpSize
             *MOVE.B  #$9,(A1)+  *Tab over
             RTS
@@ -262,27 +264,29 @@ DECODE_4E   MOVE.W  D4,D5
             BEQ     OPCODE_RTS
             BRA     OPCODE_JSR  *It's JSR
             
-OPCODE_JSR  MOVE.B  #$4A,(A1)+  *Move char J
-            MOVE.B  #$53,(A1)+  *Move char S
-            MOVE.B  #$52,(A1)+  *Move char R
-            MOVE.B  #$9,(A1)+   *Tab
+OPCODE_JSR  MOVE.B  #$4A,(A2)+  *Move char J
+            MOVE.B  #$53,(A2)+  *Move char S
+            MOVE.B  #$52,(A2)+  *Move char R
+            MOVE.B  #$9,(A2)+   *Tab
+            ADD.B   #4, PrintLen
             MOVE.W  D4,D5
             BRA     GET_EA      *Decode EA
             RTS
             
-OPCODE_LEA  MOVE.B  #$4C,(A1)+  *Move char L
-            MOVE.B  #$45,(A1)+  *Move char E
-            MOVE.B  #$41,(A1)+  *Move char A
-            MOVE.B  #$9,(A1)+   *Tab over
+OPCODE_LEA  MOVE.B  #$4C,(A2)+  *Move char L
+            MOVE.B  #$45,(A2)+  *Move char E
+            MOVE.B  #$41,(A2)+  *Move char A
+            MOVE.B  #$9,(A2)+   *Tab over
+            ADD.B   #4, PrintLen
             BRA     GET_EA      *Decode EA
             BRA     GET_REGISTER_An    *Get the register
             RTS
 
 GET_REGISTER_An     JSR     BIT11109    *Get the register
                     MOVE.B  D5, EARegNum *Assign register val to varaible
-                    MOVE.B  #$41,(A1)+  *Move char A
+                    MOVE.B  #$41,(A2)+  *Move char A
                     ADDI.B  #$30,D5     *Convert number to string
-                    MOVE.B  D5, (A1)+   *Load converted string
+                    MOVE.B  D5, (A2)+   *Load converted string
                     RTS
                     
 *-----------------------------------------------------
@@ -295,24 +299,27 @@ IS_0110     MOVE.W  D4,D5
             BEQ     OPCODE_BRA  
             *TO-DO Bcc
 
-OPCODE_BRA  MOVE.B  #$42,(A1)+  *Move char B
-            MOVE.B  #$52,(A1)+  *Move char R
-            MOVE.B  #$41,(A1)+  *Move char A
-            MOVE.B  #$9,(A1)+   *Tab over
+OPCODE_BRA  MOVE.B  #$42,(A2)+  *Move char B
+            MOVE.B  #$52,(A2)+  *Move char R
+            MOVE.B  #$41,(A2)+  *Move char A
+            MOVE.B  #$9,(A2)+   *Tab over
             MOVE.W  D4,D5       
+            ADD.B   #4, PrintLen
             ADD.W   (A2),D5     *<PC> + Displacement
 
 *-----------------------------------------------------
 *First four bits are equal to 1000 - 
 *Possible OP-Codes:DIVU.W
 *-----------------------------------------------------
-IS_1000     MOVE.B  #$44, (A1)+     *Move char D
-            MOVE.B  #$49, (A1)+     *Move char I
-            MOVE.B  #$56, (A1)+     *Move char V
-            MOVE.B  #$55, (A1)+     *Move char U
-            MOVE.B  #$2E, (A1)+     *Move char .
-            MOVE.B  #$57,(A1)+      *Move char W
-            MOVE.B  #$9,(A1)+       *Tab over
+IS_1000     MOVE.B  #$44, (A2)+     *Move char D
+            MOVE.B  #$49, (A2)+     *Move char I
+            MOVE.B  #$56, (A2)+     *Move char V
+            MOVE.B  #$55, (A2)+     *Move char U
+            MOVE.B  #$2E, (A2)+     *Move char .
+            MOVE.B  #$57,(A2)+      *Move char W
+            MOVE.B  #$9,(A2)+       *Tab over
+            
+            ADD.B   #7, PrintLen
             
             CLR     D3
             MOVE.B  D5, D3          *Prep for jump table
@@ -320,8 +327,10 @@ IS_1000     MOVE.B  #$44, (A1)+     *Move char D
             LEA     DMODE, A3       *Load DMODE jump table - will print size
             JSR     0(A3, D3)
             
-            MOVE.B  #$2C, (A1)+     *Move char ,
-            MOVE.B  #$20, (A1)+     *Move char ' '
+            MOVE.B  #$2C, (A2)+     *Move char ,
+            MOVE.B  #$20, (A2)+     *Move char ' '
+            
+            ADD.B   #2, PrintLen
             
             JSR     BIT11109        *retrieves register values
             MOVE.B  D5, DestRegNum  *Stores retrieved values into variable
@@ -333,15 +342,15 @@ IS_1000     MOVE.B  #$44, (A1)+     *Move char D
 *First four bits are equal to 1001 - 
 *Possible OP-Codes:SUB (Page 278)
 *-----------------------------------------------------
-IS_1001     MOVE.B  #$53, (A1)+     *Move char S
-            MOVE.B  #$55, (A1)+     *Move char U
-            MOVE.B  #$42, (A1)+     *Move char B
-            MOVE.B  #$2E, (A1)+     *Move char . 
+IS_1001     MOVE.B  #$53, (A2)+     *Move char S
+            MOVE.B  #$55, (A2)+     *Move char U
+            MOVE.B  #$42, (A2)+     *Move char B
+            MOVE.B  #$2E, (A2)+     *Move char . 
             JSR     BIT11109
             MOVE.B  D5, DnRegNum    *Holds value for Dn#
             JSR     BIT876          *Jump to get OPMODE bits
             MOVE.B  D5, OpSize      *move OPMODE size to variable- This tells where Dn is
-            
+            ADD.B   #4, PrintLen
             CLR     D3
             MOVE.B  D5, D3
             MULU    #6, D3          *Form offset
@@ -352,9 +361,9 @@ IS_1001     MOVE.B  #$53, (A1)+     *Move char S
             BGT     DNOut           *Branch operation for when Dn is first
             BLT     GET_EA          *When <ea> is first
             
-            MOVE.B  #$2C, (A1)+     *Move char ,
-            MOVE.B  #$20, (A1)+     *Move char ' '
-            
+            MOVE.B  #$2C, (A2)+     *Move char ,
+            MOVE.B  #$20, (A2)+     *Move char ' '
+            ADD.B   #2, PrintLen
             CMPI.B  #3, OpSize
             BGT     GET_EA          *Second part operation for when Dn is first
             BLT     DNOut           *Second part operation for when <ea> is first
@@ -375,11 +384,11 @@ IS_1100     JSR     BIT876
 *-----------------------------------------------------
 *First four bits are equal to 1100 and BIT876 is NOT 111
 *-----------------------------------------------------
-IS_AND      MOVE.B  #$41, (A1)+     *Move char A
-            MOVE.B  #$41, (A1)+     *Move char A
-            MOVE.B  #$44, (A1)+     *Move char D
-            MOVE.B  #$2E, (A1)+     *Move char . 
-            
+IS_AND      MOVE.B  #$41, (A2)+     *Move char A
+            MOVE.B  #$41, (A2)+     *Move char A
+            MOVE.B  #$44, (A2)+     *Move char D
+            MOVE.B  #$2E, (A2)+     *Move char . 
+            ADD.B   #4, PrintLen
             *OpSize saved from parent call
             JSR     BIT11109
             MOVE.B  D5, DnRegNum    *Holds value for Dn#
@@ -394,9 +403,9 @@ IS_AND      MOVE.B  #$41, (A1)+     *Move char A
             BGT     DNOut           *Branch operation for when Dn is first
             BLT     GET_EA          *When <ea> is first
             
-            MOVE.B  #$2C, (A1)+     *Move char ,
-            MOVE.B  #$20, (A1)+     *Move char ' '
-            
+            MOVE.B  #$2C, (A2)+     *Move char ,
+            MOVE.B  #$20, (A2)+     *Move char ' '
+            ADD.B   #2, PrintLen
             CMPI.B  #3, OpSize
             BGT     GET_EA          *Second part operation for when Dn is first
             BLT     DNOut           *Second part operation for when <ea> is first
@@ -406,23 +415,23 @@ IS_AND      MOVE.B  #$41, (A1)+     *Move char A
 *-----------------------------------------------------
 *First four bits are equal to 1100 and BIT876 is 111
 *-----------------------------------------------------
-IS_MULS     MOVE.B  #$4D, (A1)+     *Move char M
-            MOVE.B  #$4D, (A1)+     *Move char U
-            MOVE.B  #$4D, (A1)+     *Move char L
-            MOVE.B  #$4D, (A1)+     *Move char S
-            MOVE.B  #$2E, (A1)+     *Move char .
-            MOVE.B  #$57,(A1)+      *Move char W
-            MOVE.B  #$9,(A1)+       *Tab over
-            
+IS_MULS     MOVE.B  #$4D, (A2)+     *Move char M
+            MOVE.B  #$4D, (A2)+     *Move char U
+            MOVE.B  #$4D, (A2)+     *Move char L
+            MOVE.B  #$4D, (A2)+     *Move char S
+            MOVE.B  #$2E, (A2)+     *Move char .
+            MOVE.B  #$57,(A2)+      *Move char W
+            MOVE.B  #$9,(A2)+       *Tab over
+            ADD.B   #7, PrintLen
             CLR     D3
             MOVE.B  D5, D3          *Prep for jump table
             MULU    #6, D3          *Form offset
             LEA     DMODE, A3       *Load DMODE jump table - will print size
             JSR     0(A3, D3)
             
-            MOVE.B  #$2C, (A1)+     *Move char ,
-            MOVE.B  #$20, (A1)+     *Move char ' '
-            
+            MOVE.B  #$2C, (A2)+     *Move char ,
+            MOVE.B  #$20, (A2)+     *Move char ' '
+            ADD.B   #2, PrintLen
             JSR     BIT11109        *retrieves register values
             MOVE.B  D5, DestRegNum  *Stores retrieved values into variable
             
@@ -472,10 +481,11 @@ IS_REG_SHIFT    JSR BIT11109
 *Bits 876 = 100, 101, 110(DestMode) -and- Bits 543 = 101(EAMode) (LSL Reg Shift)
 *OR- Bits 876 = 111(DestMode) -and- Bits 11109 = 001(DnRegNum) (LSL Mem Shift)
 *-----------------------------------------------------
-IS_LSL  MOVE.B  #$4D, (A1)+     *Move char L
-        MOVE.B  #$4D, (A1)+     *Move char S
-        MOVE.B  #$4D, (A1)+     *Move char L
-        MOVE.B  #$2E, (A1)+     *Move char .
+IS_LSL  MOVE.B  #$4D, (A2)+     *Move char L
+        MOVE.B  #$4D, (A2)+     *Move char S
+        MOVE.B  #$4D, (A2)+     *Move char L
+        MOVE.B  #$2E, (A2)+     *Move char .
+        ADD.B   #4, PrintLen
         MOVE.B  DestMode, D5
         CMPI.B  #7, D5          
         BEQ     MEM_SHIFT       *check if 876 is 7 =Memory Shift (only 1 parameter)
@@ -488,10 +498,11 @@ IS_LSL  MOVE.B  #$4D, (A1)+     *Move char L
 *Bits 876 = 100, 101, 110(DestMode) -and- Bits 543 = 100(EAMode) (ASL Reg Shift)
 *OR- Bits 876 = 111(DestMode) -and- Bits 11109 = 000(DnRegNum) (ASL Mem Shift)
 *-----------------------------------------------------
-IS_ASL  MOVE.B  #$41, (A1)+     *Move char A
-        MOVE.B  #$4D, (A1)+     *Move char S
-        MOVE.B  #$4D, (A1)+     *Move char L
-        MOVE.B  #$2E, (A1)+     *Move char .
+IS_ASL  MOVE.B  #$41, (A2)+     *Move char A
+        MOVE.B  #$4D, (A2)+     *Move char S
+        MOVE.B  #$4D, (A2)+     *Move char L
+        MOVE.B  #$2E, (A2)+     *Move char .
+        ADD.B   #4, PrintLen
         MOVE.B  DestMode, D5
         CMPI.B  #7, D5          
         BEQ     MEM_SHIFT       *check if 876 is 7 =Memory Shift (only 1 parameter)
@@ -504,8 +515,9 @@ IS_ASL  MOVE.B  #$41, (A1)+     *Move char A
 *-----------------------------------------------------  
 
 *Memory shift helper
-MEM_SHIFT       MOVE.B  #$57,(A1)+      *Move char W
-                MOVE.B  #$9,(A1)+       *Tab over
+MEM_SHIFT       MOVE.B  #$57,(A2)+      *Move char W
+                MOVE.B  #$9,(A2)+       *Tab over
+                ADD.B   #2, PrintLen
                 BRA     GET_EA          *May cause issues, should not use 000(Dn), 001(An), or #<data>
                 RTS
                 
@@ -522,9 +534,9 @@ REG_SHIFT       MOVE.B  DestMode, D5
                 JSR     0(A3, D3)
                 
                 *prep for second parameter
-                MOVE.B  #$2C, (A1)+     *Move char ,
-                MOVE.B  #$20, (A1)+     *Move char ' '
-                
+                MOVE.B  #$2C, (A2)+     *Move char ,
+                MOVE.B  #$20, (A2)+     *Move char ' '
+                ADD.B   #4, PrintLen
                 JSR     GET_EA          *Load second parameter
                 
                 RTS
@@ -555,53 +567,58 @@ GET_EA      JSR     BIT543
 MODE_000    MOVE.B  D5, EAMODE  *Assign mode val to variable
             JSR     BIT210      *Get the data register
             MOVE.B  D5, EARegNum *Assign register val to varaible
-            MOVE.B  #$44,(A1)+  *Move char D
+            MOVE.B  #$44,(A2)+  *Move char D
             ADDI.B  #$30,D5     *Convert number to string
-            MOVE.B  D5, (A1)+   *Load converted string
+            MOVE.B  D5, (A2)+   *Load converted string
+            ADD.B   #2, PrintLen
             RTS
 
 *001 = An         
 MODE_001    MOVE.B  D5, EAMODE  *Assign mode val to variable
             JSR     BIT210      *Get the address register
             MOVE.B  D5, EARegNum *Assign register val to varaible
-            MOVE.B  #$41,(A1)+  *Move char A
+            MOVE.B  #$41,(A2)+  *Move char A
             ADDI.B  #$30,D5     *Convert number to string
-            MOVE.B  D5, (A1)+   *Load converted string
+            MOVE.B  D5, (A2)+   *Load converted string
+            ADD.B   #2, PrintLen
             RTS 
 
 *010 = (An)      
 MODE_010    MOVE.B  D5, EAMODE  *Assign mode val to variable
             JSR     BIT210      *Get the data register
             MOVE.B  D5, EARegNum *Assign register val to varaible
-            MOVE.B  #$28,(A1)+  *Move '('
-            MOVE.B  #$41,(A1)+  *Move char A
+            MOVE.B  #$28,(A2)+  *Move '('
+            MOVE.B  #$41,(A2)+  *Move char A
             ADDI.B  #$30,D5     *Convert number to string
-            MOVE.B  D5, (A1)+   *Load converted string
-            MOVE.B  #$29,(A1)+  *Move ')'
+            MOVE.B  D5, (A2)+   *Load converted string
+            MOVE.B  #$29,(A2)+  *Move ')'
+            ADD.B   #4, PrintLen
             RTS
 
 *100 = -(An)
 MODE_100    MOVE.B  D5, EAMODE  *Assign mode val to variable
             JSR     BIT210      *Get the data register
             MOVE.B  D5, EARegNum *Assign register val to varaible
-            MOVE.B  #$2D,(A1)+  *Move '-'
-            MOVE.B  #$28,(A1)+  *Move '('
-            MOVE.B  #$41,(A1)+  *Move char A
+            MOVE.B  #$2D,(A2)+  *Move '-'
+            MOVE.B  #$28,(A2)+  *Move '('
+            MOVE.B  #$41,(A2)+  *Move char A
             ADDI.B  #$30,D5     *Convert number to string
-            MOVE.B  D5, (A1)+   *Load converted string
-            MOVE.B  #$29,(A1)+  *Move ')'
+            MOVE.B  D5, (A2)+   *Load converted string
+            MOVE.B  #$29,(A2)+  *Move ')'
+            ADD.B   #5, PrintLen
             RTS
 
 *011 = (An)+          
 MODE_011    MOVE.B  D5, EAMODE  *Assign mode val to variable
             JSR     BIT210      *Get the data register
             MOVE.B  D5, EARegNum *Assign register val to varaible
-            MOVE.B  #$28,(A1)+  *Move '('
-            MOVE.B  #$41,(A1)+  *Move char A
+            MOVE.B  #$28,(A2)+  *Move '('
+            MOVE.B  #$41,(A2)+  *Move char A
             ADDI.B  #$30,D5     *Convert number to string
-            MOVE.B  D5, (A1)+   *Load converted string
-            MOVE.B  #$29,(A1)+  *Move ')'
-            MOVE.B  #$2B,(A1)+  *Move '+'
+            MOVE.B  D5, (A2)+   *Load converted string
+            MOVE.B  #$29,(A2)+  *Move ')'
+            MOVE.B  #$2B,(A2)+  *Move '+'
+            ADD.B   #5, PrintLen
             RTS
 
 *111 = (xxx).W, (xxx).L, #<data>
@@ -630,10 +647,10 @@ EA_APPEND   *TO-DO read how many bits are in the size
 *Will fill values for: BitLen, DnRegNum, OpSize, EAMode, EARegNum
 *-----------------------------------------------------
 IS_1101     *MOVEM.L D0-D7/A0-A6, -(SP)  *Copy contents of all registers into previous SP
-            MOVE.B  #$41, (A1)+     *Move char A
-            MOVE.B  #$44, (A1)+     *Move char D
-            MOVE.B  #$44, (A1)+     *Move char D
-            MOVE.B  #$2E, (A1)+     *Move char . 
+            MOVE.B  #$41, (A2)+     *Move char A
+            MOVE.B  #$44, (A2)+     *Move char D
+            MOVE.B  #$44, (A2)+     *Move char D
+            MOVE.B  #$2E, (A2)+     *Move char . 
             JSR     BIT11109
             MOVE.B  D5, DnRegNum    *Holds value for Dn#
             JSR     BIT876          *Jump to get OPMODE bits
@@ -649,9 +666,9 @@ IS_1101     *MOVEM.L D0-D7/A0-A6, -(SP)  *Copy contents of all registers into pr
             BGT     DNOut           *Branch operation for when Dn is first
             BLT     GET_EA          *When <ea> is first
             
-            MOVE.B  #$2C, (A1)+     *Move char ,
-            MOVE.B  #$20, (A1)+     *Move char ' '
-            
+            MOVE.B  #$2C, (A2)+     *Move char ,
+            MOVE.B  #$20, (A2)+     *Move char ' '
+            ADD.B   #6, PrintLen
             CMPI.B  #3, OpSize
             BGT     GET_EA          *Second part operation for when Dn is first
             BLT     DNOut           *Second part operation for when <ea> is first
@@ -701,43 +718,53 @@ BIT210      CLR.L   D5
             RTS 
             
 OPCODE_NOT  JSR     BIT543
-            MOVE.B  #$4E,(A1)+  *N
-            MOVE.B  #$4F,(A1)+  *O
-            MOVE.B  #$54,(A1)+  *T
+            MOVE.B  #$4E,(A2)+  *N
+            MOVE.B  #$4F,(A2)+  *O
+            MOVE.B  #$54,(A2)+  *T
+            ADD.B   #3, PrintLen
+            *ADD.B   #3, PrintLen
             JSR     GET_EA
             
 
-OPCODE_NOP  MOVEA.L A1,A2
-            MOVE.B  #$4E,(A1)+  *N
-            MOVE.B  #$4F,(A1)+  *O
-            MOVE.B  #$50,(A1)+  *P
-            MOVE.B  #3, D1      *This loads the length of the string to read
+OPCODE_NOP  *MOVEA.L A1,A2
+            MOVE.B  #$4E,(A2)+  *N
+            MOVE.B  #$4F,(A2)+  *O
+            MOVE.B  #$50,(A2)+  *P
+            *MOVE.B  #3, D1      *This loads the length of the string to read
+            ADD.B   #3, PrintLen
             JSR     PRINT
             RTS
 
-OPCODE_RTS  MOVE.B  #$52,(A1)+  *R
-            MOVE.B  #$54,(A1)+  *T
-            MOVE.B  #$53,(A1)+  *S
-            MOVE.B  #3, D1      *This loads the length of the string to read
+OPCODE_RTS  MOVE.B  #$52,(A2)+  *R
+            MOVE.B  #$54,(A2)+  *T
+            MOVE.B  #$53,(A2)+  *S
+            *MOVE.B  #3, D1      *This loads the length of the string to read
+            ADD.B   #3, PrintLen
+            MOVE.B  PrintLen, D1
             JSR     PRINT
             RTS
             
 PRINT       MOVE.B  #0, D0
+            MOVE.B  PrintLen, D1
+            LEA     OutPut, A2
             MOVEA.L A2, A1
             TRAP    #15
+            MOVE.B  #0, PrintLen
+            *MOVE.L  #$FFFF, OutPut
             RTS
             *JSR     LOOPCOUNT
 
+*RESET_OUT   
 *-----------------------------------------------------	
 *Op-code move size manager - first four bits are 01(B), 11(W), 10(L)	
 *-----------------------------------------------------	
 MOVESIZE    *MOVEM.L D0-D7/A0-A6, -(SP)
-            MOVE.B  #$4D,(A1)+  *Move char M	
-            MOVE.B  #$4F,(A1)+  *Move char O	
-            MOVE.B  #$56,(A1)+  *Move char V	
-            MOVE.B  #$45,(A1)+  *Move char E	
-            MOVE.B  #$2E,(A1)+  *Move char .	
-            
+            MOVE.B  #$4D,(A2)+  *Move char M	
+            MOVE.B  #$4F,(A2)+  *Move char O	
+            MOVE.B  #$56,(A2)+  *Move char V	
+            MOVE.B  #$45,(A2)+  *Move char E	
+            MOVE.B  #$2E,(A2)+  *Move char .	
+            ADD.B   #5, PrintLen
             *Adds size modifier to instruction and stores size into OpSize
             CMPI.B  #$01,D5     *If first 4 bits = 0001 - Byte	
             BEQ     IS_0001	
@@ -747,13 +774,13 @@ MOVESIZE    *MOVEM.L D0-D7/A0-A6, -(SP)
             BEQ     IS_0010
             
             *Instruction and instruction size set, move to first paramater
-            MOVE.B  #$9,(A1)+  *Tab over
+            MOVE.B  #$9,(A2)+  *Tab over
 
             JSR     GET_EA      *Routes to routine to handle register for source output
             *first parameter loaded
-            MOVE.B  #$2C, (A1)+ *Move char ,
-            MOVE.B  #$20, (A1)+ *Move char ' '
-            
+            MOVE.B  #$2C, (A2)+ *Move char ,
+            MOVE.B  #$20, (A2)+ *Move char ' '
+            ADD.B   #3, PrintLen
             *look at second parameter
             JSR     BIT876	    *store the destination
             MOVE.B  D5, DestMode
@@ -803,18 +830,21 @@ OPMRET      RTS
 *OP-Mode when destination is Dn
 * Works for SUB, AND, and ADD (ASL/LSL)
 *-----------------------------------------------------
-OM000   MOVE.B  #$42,(A1)+  *Move char B
-        MOVE.B  #$9,(A1)+   *Tab over
+OM000   MOVE.B  #$42,(A2)+  *Move char B
+        MOVE.B  #$9,(A2)+   *Tab over
+        ADD.B   #2, PrintLen
         MOVE.B  #8, BitLen
         JSR    OPMRET   
 
-OM001   MOVE.B  #$57,(A1)+  *Move char W
-        MOVE.B  #$9,(A1)+   *Tab over
+OM001   MOVE.B  #$57,(A2)+  *Move char W
+        MOVE.B  #$9,(A2)+   *Tab over
+        ADD.B   #2, PrintLen
         MOVE.B  #16, BitLen
         JSR    OPMRET
 
-OM010   MOVE.B  #$4C,(A1)+  *Move char L
-        MOVE.B  #$9,(A1)+   *Tab over
+OM010   MOVE.B  #$4C,(A2)+  *Move char L
+        MOVE.B  #$9,(A2)+   *Tab over
+        ADD.B   #2, PrintLen
         MOVE.B  #32, BitLen
         JSR    OPMRET
 
@@ -827,31 +857,35 @@ OM011   BRA HEX_ERROR
 *OP-Mode when destination is ea, source is Dn
 * Works for SUB, AND, and ADD
 *-----------------------------------------------------
-OM100   MOVE.B  #$42,(A1)+  *Move char B
-        MOVE.B  #$9,(A1)+   *Tab over
+OM100   MOVE.B  #$42,(A2)+  *Move char B
+        MOVE.B  #$9,(A2)+   *Tab over
+        ADD.B   #2, PrintLen
         MOVE.B  #8, BitLen
         JSR    OPMRET
 
 
-OM101   MOVE.B  #$57,(A1)+  *Move char W
-        MOVE.B  #$9,(A1)+   *Tab over
+OM101   MOVE.B  #$57,(A2)+  *Move char W
+        MOVE.B  #$9,(A2)+   *Tab over
+        ADD.B   #2, PrintLen
         MOVE.B  #16, BitLen
         JSR    OPMRET
 
 
-OM110   MOVE.B  #$4C,(A1)+  *Move char L
-        MOVE.B  #$9,(A1)+   *Tab over
+OM110   MOVE.B  #$4C,(A2)+  *Move char L
+        MOVE.B  #$9,(A2)+   *Tab over
+        ADD.B   #2, PrintLen
         MOVE.B  #32, BitLen
         JSR    OPMRET
         
 *-----------------------------------------------------
 *Loads Dn and Dn reg num
 *-----------------------------------------------------
-DNOUT       MOVE.B  #$44, (A1)+     *Load char D
+DNOUT       MOVE.B  #$44, (A2)+     *Load char D
+            ADD.B   #2, PrintLen
             CLR.L   D5
             MOVE.B  DnRegNum, D5    *move register value into D5
             ADDI.B  #$30,D5         *Convert number to string
-            MOVE.B  D5, (A1)+       *Load register value to output
+            MOVE.B  D5, (A2)+       *Load register value to output
             RTS
             
 *-----------------------------------------------------
@@ -872,51 +906,56 @@ DMODE_RET   RTS
 *Jump table for loading output mode and register into instruction
 *-----------------------------------------------------
 DM000       MOVE.B  #0, DestMode    *Dn
-            MOVE.B  #$44, (A1)+     *Move char D
+            MOVE.B  #$44, (A2)+     *Move char D
             CLR     D3
             MOVE.B  DestRegNum, D3
             ADDI.B  #$30,D5         *Convert number to string
-            MOVE.B  D5, (A1)+   *Load converted string
+            MOVE.B  D5, (A2)+   *Load converted string
+            ADD.B   #2, PrintLen
             JSR     DMODE_RET
 
 DM001       MOVE.B  #1, DestMode    *An (NOT VALID for Destination for MOVE)
-            MOVE.B  #$41, (A1)+     *Move char A
+            MOVE.B  #$41, (A2)+     *Move char A
             CLR     D3
             MOVE.B  DestRegNum, D3
             ADDI.B  #$30,D5         *Convert number to string
-            MOVE.B  D5, (A1)+   *Load converted string
+            MOVE.B  D5, (A2)+   *Load converted string
+            ADD.B   #2, PrintLen
             JSR     DMODE_RET
 
 DM010       MOVE.B  #2, DestMode    *(An)
-            MOVE.B  #$28,(A1)+  *Move '('
-            MOVE.B  #$41, (A1)+     *Move char A
+            MOVE.B  #$28,(A2)+  *Move '('
+            MOVE.B  #$41, (A2)+     *Move char A
             CLR     D3
             MOVE.B  DestRegNum, D3
             ADDI.B  #$30,D5         *Convert number to string
-            MOVE.B  D5, (A1)+   *Load converted string
-            MOVE.B  #$29,(A1)+  *Move ')'
+            MOVE.B  D5, (A2)+   *Load converted string
+            MOVE.B  #$29,(A2)+  *Move ')'
+            ADD.B   #4, PrintLen
             JSR     DMODE_RET
 
 DM011       MOVE.B  #3, DestMode    *(An)+
-            MOVE.B  #$28,(A1)+  *Move '('
-            MOVE.B  #$41, (A1)+     *Move char A
+            MOVE.B  #$28,(A2)+  *Move '('
+            MOVE.B  #$41, (A2)+     *Move char A
             CLR     D3
             MOVE.B  DestRegNum, D3
             ADDI.B  #$30,D5         *Convert number to string
-            MOVE.B  D5, (A1)+   *Load converted string
-            MOVE.B  #$29,(A1)+  *Move ')'
-            MOVE.B  #$2B,(A1)+  *Move '+'
+            MOVE.B  D5, (A2)+   *Load converted string
+            MOVE.B  #$29,(A2)+  *Move ')'
+            MOVE.B  #$2B,(A2)+  *Move '+'
+            ADD.B   #5, PrintLen
             JSR     DMODE_RET
 
 DM100       MOVE.B  #4, DestMode    *-(An)
-            MOVE.B  #$2D,(A1)+  *Move '-'
-            MOVE.B  #$28,(A1)+  *Move '('
-            MOVE.B  #$41, (A1)+     *Move char A
+            MOVE.B  #$2D,(A2)+  *Move '-'
+            MOVE.B  #$28,(A2)+  *Move '('
+            MOVE.B  #$41, (A2)+     *Move char A
             CLR     D3
             MOVE.B  DestRegNum, D3
             ADDI.B  #$30,D5         *Convert number to string
-            MOVE.B  D5, (A1)+   *Load converted string
-            MOVE.B  #$29,(A1)+  *Move ')'
+            MOVE.B  D5, (A2)+   *Load converted string
+            MOVE.B  #$29,(A2)+  *Move ')'
+            ADD.B   #5, PrintLen
             JSR     DMODE_RET
 
 DM101       MOVE.B  #5, DestMode    *Not currently used- branch to error
@@ -989,7 +1028,7 @@ TO_ASCII_WORD            MOVE.W     D6,D7
                          CMPI.B     #$9,D7
                          BGT        ASCII_LETTER
                          ADDI.B     #$30,D7
-                         MOVE.B     D7,(A1)+
+                         MOVE.B     D7,(A2)+
                          MOVE.W     D6,D7
                          LSR.W      #$8,D7  *Get the second bit/byte
                          LSL.B      #$4,D7
@@ -997,7 +1036,7 @@ TO_ASCII_WORD            MOVE.W     D6,D7
                          CMPI.B     #$9,D7
                          BGT        ASCII_LETTER
                          ADDI.B     #$30,D7
-                         MOVE.B     D7,(A1)+
+                         MOVE.B     D7,(A2)+
                          MOVE.W     D6,D7
                          LSR.W      #$4,D7  *Get the third bit/byte
                          LSL.W      #$8,D7
@@ -1007,7 +1046,7 @@ TO_ASCII_WORD            MOVE.W     D6,D7
                          CMPI.B     #$9,D7
                          BGT        ASCII_LETTER
                          ADDI.B     #$30,D7
-                         MOVE.B     D7,(A1)+
+                         MOVE.B     D7,(A2)+
                          LSL.W      #$8,D7  *Get the last bit/byte
                          LSL.W      #$4,D7
                          LSR.W      #$8,D7
@@ -1015,7 +1054,7 @@ TO_ASCII_WORD            MOVE.W     D6,D7
                          CMPI.B     #$9,D7
                          BGT        ASCII_LETTER
                          ADDI.B     #$30,D7
-                         MOVE.B     D7,(A1)+
+                         MOVE.B     D7,(A2)+
                          RTS
                          
 TO_ASCII_LONG            MOVE.L     D6,D7
@@ -1024,13 +1063,13 @@ TO_ASCII_LONG            MOVE.L     D6,D7
                          LSR.W      #$8,D7  *Then convert the first word
                          LSR.W      #$4,D7  *Get the first bit/byte
                          JSR        TO_ASCII
-                         MOVE.B     D7,(A1)+
+                         MOVE.B     D7,(A2)+
                          MOVE.W     D6,D7
                          LSR.W      #$8,D7  *Get the second bit/byte
                          LSL.B      #$4,D7
                          LSR.B      #$4,D7
                          JSR        TO_ASCII
-                         MOVE.B     D7,(A1)+
+                         MOVE.B     D7,(A2)+
                          MOVE.W     D6,D7
                          LSR.W      #$4,D7  *Get the third bit/byte
                          LSL.W      #$8,D7
@@ -1038,25 +1077,25 @@ TO_ASCII_LONG            MOVE.L     D6,D7
                          LSR.W      #$8,D7
                          LSR.B      #$4,D7
                          JSR        TO_ASCII
-                         MOVE.B     D7,(A1)+
+                         MOVE.B     D7,(A2)+
                          MOVE.W     D6,D7
                          LSL.W      #$8,D7  *Get the last bit/byte
                          LSL.W      #$4,D7
                          LSR.W      #$8,D7
                          LSR.B      #$4,D7
                          JSR        TO_ASCII
-                         MOVE.B     D7,(A1)+
+                         MOVE.B     D7,(A2)+
                          MOVE.L     D6,D7       *Get the second word
                          LSR.W      #$8,D7  *Then convert the second word
                          LSR.W      #$4,D7  *Get the first bit/byte
                          JSR        TO_ASCII
-                         MOVE.B     D7,(A1)+
+                         MOVE.B     D7,(A2)+
                          MOVE.W     D6,D7
                          LSR.W      #$8,D7  *Get the second bit/byte
                          LSL.B      #$4,D7
                          LSR.B      #$4,D7
                          JSR        TO_ASCII
-                         MOVE.B     D7,(A1)+
+                         MOVE.B     D7,(A2)+
                          MOVE.W     D6,D7
                          LSR.W      #$4,D7  *Get the third bit/byte
                          LSL.W      #$8,D7
@@ -1064,13 +1103,13 @@ TO_ASCII_LONG            MOVE.L     D6,D7
                          LSR.W      #$8,D7
                          LSR.B      #$4,D7
                          JSR        TO_ASCII
-                         MOVE.B     D7,(A1)+
+                         MOVE.B     D7,(A2)+
                          LSL.W      #$8,D7  *Get the last bit/byte
                          LSL.W      #$4,D7
                          LSR.W      #$8,D7
                          LSR.B      #$4,D7
                          JSR        TO_ASCII
-                         MOVE.B     D7,(A1)+
+                         MOVE.B     D7,(A2)+
                          RTS
 
 TO_ASCII                CMPI.B      #9,D7
@@ -1094,7 +1133,7 @@ InvalidMess DC.B    'Error! The entered address is invalid!',0
 ErrorMess   DC.B    'Error! Invalid input!',0
 EnterMess   DC.B    'Press enter to continue',0
 
-OutPut      DS.L    1
+
 LoopCounter DS.B    1
 OpSize      DS.B    1
 DnRegNum    DS.B    1
@@ -1117,6 +1156,7 @@ EndAddr        DC.L    $510 *Stores the ending addres of the input file
 *END of Program Message
 EndOfFileMess   DC.B     'Would you like to disassemble file again? [y/n]',0
 
+OutPut      DS.L    1
 
     END    START        ; last line of source
 
