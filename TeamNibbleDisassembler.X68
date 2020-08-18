@@ -739,7 +739,7 @@ OPCODE_RTS  MOVE.B  #$52,(A2)+  *R
             MOVE.B  #$54,(A2)+  *T
             MOVE.B  #$53,(A2)+  *S
             *MOVE.B  #3, D1      *This loads the length of the string to read
-            ADD.B   #3, PrintLen
+            ADD.B   #$3, PrintLen
             MOVE.B  PrintLen, D1
             JSR     PRINT
             RTS
@@ -1159,6 +1159,7 @@ EndOfFileMess   DC.B     'Would you like to disassemble file again? [y/n]',0
 OutPut      DS.L    1
 
     END    START        ; last line of source
+
 
 
 
