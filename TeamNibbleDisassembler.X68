@@ -179,46 +179,50 @@ FIRST_FOUR_BITS     MOVE.W  D4,D5   *Move the instruction to decode
                     BEQ     IS_0110
                     CMPI.B  #$13,D5 *If first 4 bits = 1101 (13-ADD)
                     BEQ     IS_1101
-                    BRA     HEX_ERROR *If none of the bits match print error
+                    BRA     HEX_ERROR *If none of the bits match print error - Need to change, can't reach RTS
                     RTS
                     
 *-----------------------------------------------------
 *First four bits are equal to 0001 - prompt MOVE (Byte)
 *-----------------------------------------------------
 IS_0001     MOVE.B  #$42,(A1)+  *Move char B
-            MOVE.B  #$9,(A1)+  *Tab over
-            MOVE.B  D5, OpSize  *Store size of instruction
-            JSR BIT876          *Looks at mode for move
-            CMPI.B  #$00,D5     *If next 3 bits = 000
-            BEQ     MODE_000
+            MOVE.B  #8, OpSize
+            RTS
+            *MOVE.B  #$9,(A1)+  *Tab over
+            *JSR BIT876          *Looks at mode for move
+            *CMPI.B  #$00,D5     *If next 3 bits = 000
+            *BEQ     MODE_000
             *Move Bits 8 7 6 do not allow for 001 mode type - An
-            CMPI.B  #$02,D5     *If next 3 bits = 010
-            BEQ     IS_0011
-            CMPI.B  #$03,D5     *If next 3 bits = 011
-            BEQ     IS_0011  
-            CMPI.B  #$04,D5     *If next 3 bits = 100
-            BEQ     IS_0100
-            CMPI.B  #$05,D5     *If next 3 bits = 101
-            BEQ     IS_0110
-            CMPI.B  #$06,D5     *If next 3 bits = 110
-            BEQ     IS_0110
-            CMPI.B  #$07,D5     *If next 3 bits = 111
-            BEQ     IS_0110
+            *CMPI.B  #$02,D5     *If next 3 bits = 010
+            *BEQ     IS_0011
+            *CMPI.B  #$03,D5     *If next 3 bits = 011
+            *BEQ     IS_0011  
+            *CMPI.B  #$04,D5     *If next 3 bits = 100
+            *BEQ     IS_0100
+            *CMPI.B  #$05,D5     *If next 3 bits = 101
+            *BEQ     IS_0110
+            *CMPI.B  #$06,D5     *If next 3 bits = 110
+            *BEQ     IS_0110
+            *CMPI.B  #$07,D5     *If next 3 bits = 111
+            *BEQ     IS_0110
             
 
 *-----------------------------------------------------
 *First four bits are equal to 0010 - prompt MOVE (Long)
 *-----------------------------------------------------
 IS_0010     MOVE.B  #$4C,(A1)+  *Move char L
-            MOVE.B  #$9,(A1)+  *Tab over
-            MOVE.B  D5, OpSize  *Store size of instruction
+            MOVE.B  #32, OpSize
+            *MOVE.B  #$9,(A1)+  *Tab over
+            *MOVE.B  D5, OpSize  *Store size of instruction
+            RTS
 
 *-----------------------------------------------------
 *First four bits are equal to 0011 - prompt MOVE (Word)
 *-----------------------------------------------------
 IS_0011     MOVE.B  #$57,(A1)+  *Move char W
-            MOVE.B  #$9,(A1)+  *Tab over
-            MOVE.B  D5, OpSize  *Store size of instruction
+            MOVE.B  #16, OpSize
+            *MOVE.B  #$9,(A1)+  *Tab over
+            RTS
 
 
 *-----------------------------------------------------
@@ -463,20 +467,47 @@ MOVESIZE    MOVEM.L D0-D7/A0-A6, -(SP)
             MOVE.B  #$56,(A1)+  *Move char V	
             MOVE.B  #$45,(A1)+  *Move char E	
             MOVE.B  #$2E,(A1)+  *Move char .	
-            	
-
-
+            
+            *Adds size modifier to instruction and stores size into OpSize
             CMPI.B  #$01,D5     *If first 4 bits = 0001 - Byte	
             BEQ     IS_0001	
             CMPI.B  #$03,D5     *If first 4 bits = 0011 - Word	
             BEQ     IS_0011	
             CMPI.B  #$02,D5     *If first 4 bits = 0010 - Long	
-            BEQ     IS_0010	
-            JSR     BIT876	
-            MOVE.B  D5, DestRegNum
+            BEQ     IS_0010
+            
+            *Instruction and instruction size set, move to first paramater
+            MOVE.B  #$9,(A1)+  *Tab over
 
-            LEA     stackPointer, SP    *how to reset our stack pointer 	
-            MOVE.L  CurAddr, DestAddr
+            JSR     GET_EA      *Routes to routine to handle register for source output
+            *first parameter loaded
+            MOVE.B  #$2C, (A1)+ *Move char ,
+            MOVE.B  #$20, (A1)+ *Move char ' '
+            
+            *look at second parameter
+            JSR     BIT876	    *store the destination
+            MOVE.B  D5, DestMode
+            
+            CMPI.B  #01, D5     *Checks if the dest mode is 001
+            BEQ     HEX_ERROR   *Dest mode 1 is an An, which is invalid for this type
+            
+            JSR     BIT11109        *retrieves register values
+            MOVE.B  D5, DestRegNum  *Stores retrieved values into variable
+            
+            MOVE.B  DestMode, D5
+            CMPI.B  #7, D3          *Check to see if the dest mode is 7
+            BEQ     CHECK_REG       *Destination 111 with register 100 is #<data> and not valid
+            
+            MOVE.B  D5, D3          *Prep for jump table
+            MULU    #6, D3          *Form offset
+            LEA     DMODE, A3       *Load DMODE jump table - will print size
+            JSR     0(A3, D3)
+            
+            *Outputs handled, return to loop
+            RTS                     *Should(needs) return to main loop process
+            
+            *LEA     stackPointer, SP    *how to reset our stack pointer 	
+            *MOVE.L  CurAddr, DestAddr
             
 *-----------------------------------------------------
 *Jump table for OP-Mode source size code when bits 876 can be B W L
@@ -516,9 +547,9 @@ OM010   MOVE.B  #$4C,(A1)+  *Move char L
         JSR    OPMRET
 
 *-----------------------------------------------------
-*Bad OP mode for table
+*Bad OP mode for this table
 *-----------------------------------------------------
-OM011
+OM011   BRA HEX_ERROR
 
 *-----------------------------------------------------
 *OP-Mode when destination is ea, source is Dn
@@ -549,6 +580,107 @@ DNOUT       MOVE.B  #$44, (A1)+     *Load char D
             MOVE.B  DnRegNum, D5    *move register value into D5
             ADDI.B  #$30,D5         *Convert number to string
             MOVE.B  D5, (A1)+       *Load register value to output
+            RTS
+            
+*-----------------------------------------------------
+*Jump table for loading destination mode and register into instruction
+*-----------------------------------------------------
+DMODE       JMP     DM000   *Dn
+            JMP     DM001   *An (Not valid for move destination) 
+            JMP     DM010   *(An)
+            JMP     DM011   *(An)+
+            JMP     DM100   *-(An)
+            JMP     DM101   *(16, An) not used at the moment?
+            JMP     DM110   *(D8, An, Xn) not used at the moment?
+            *for word or long addressing mode
+            JMP     DM111   *(xxx).W, (xxx).L, #<data> (data not valid for move)
+DMODE_RET   RTS
+
+*-----------------------------------------------------
+*Jump table for loading output mode and register into instruction
+*-----------------------------------------------------
+DM000       MOVE.B  #0, DestMode    *Dn
+            MOVE.B  #$44, (A1)+     *Move char D
+            CLR     D3
+            MOVE.B  DestRegNum, D3
+            ADDI.B  #$30,D5         *Convert number to string
+            MOVE.B  D5, (A1)+   *Load converted string
+            JSR     DMODE_RET
+
+DM001       MOVE.B  #1, DestMode    *An (NOT VALID for Destination for MOVE)
+            MOVE.B  #$41, (A1)+     *Move char A
+            CLR     D3
+            MOVE.B  DestRegNum, D3
+            ADDI.B  #$30,D5         *Convert number to string
+            MOVE.B  D5, (A1)+   *Load converted string
+            JSR     DMODE_RET
+
+DM010       MOVE.B  #2, DestMode    *(An)
+            MOVE.B  #$28,(A1)+  *Move '('
+            MOVE.B  #$41, (A1)+     *Move char A
+            CLR     D3
+            MOVE.B  DestRegNum, D3
+            ADDI.B  #$30,D5         *Convert number to string
+            MOVE.B  D5, (A1)+   *Load converted string
+            MOVE.B  #$29,(A1)+  *Move ')'
+            JSR     DMODE_RET
+
+DM011       MOVE.B  #3, DestMode    *(An)+
+            MOVE.B  #$28,(A1)+  *Move '('
+            MOVE.B  #$41, (A1)+     *Move char A
+            CLR     D3
+            MOVE.B  DestRegNum, D3
+            ADDI.B  #$30,D5         *Convert number to string
+            MOVE.B  D5, (A1)+   *Load converted string
+            MOVE.B  #$29,(A1)+  *Move ')'
+            MOVE.B  #$2B,(A1)+  *Move '+'
+            JSR     DMODE_RET
+
+DM100       MOVE.B  #4, DestMode    *-(An)
+            MOVE.B  #$2D,(A1)+  *Move '-'
+            MOVE.B  #$28,(A1)+  *Move '('
+            MOVE.B  #$41, (A1)+     *Move char A
+            CLR     D3
+            MOVE.B  DestRegNum, D3
+            ADDI.B  #$30,D5         *Convert number to string
+            MOVE.B  D5, (A1)+   *Load converted string
+            MOVE.B  #$29,(A1)+  *Move ')'
+            JSR     DMODE_RET
+
+DM101       MOVE.B  #5, DestMode    *Not currently used- branch to error
+            BRA     HEX_ERROR *If none of the bits match print error
+*            MOVE.B  #$44, (A1)+     *Move char A
+*            CLR     D3
+*            MOVE.B  DestRegNum, D3
+*            ADDI.B  #$30,D5         *Convert number to string
+*            MOVE.B  D5, (A1)+   *Load converted string
+*            JSR     DMODE_RET
+
+DM110       MOVE.B  #6, DestMode    *Not currently used- branch to error
+            BRA     HEX_ERROR *If none of the bits match print error
+*            MOVE.B  #$44, (A1)+     *Move char A
+*            CLR     D3
+*            MOVE.B  DestRegNum, D3
+*            ADDI.B  #$30,D5         *Convert number to string
+*            MOVE.B  D5, (A1)+   *Load converted string
+*            JSR     DMODE_RET
+
+DM111       MOVE.B  #7, DestMode    *Destination Mode 111 can be (xxx).W, (xxx).L, #<data>
+                                    *Should already be checked if #<data> and flagged
+            *TO-DO
+            *MOVE.B  #$44, (A1)+     *Move char A
+            CLR     D3
+            MOVE.B  DestRegNum, D3
+            JSR     DMODE_RET
+
+
+
+*-----------------------------------------------------
+*Helper method to check a destination for registry code 100
+* Dest Mode 111 and Register 100 is for #<data>
+*-----------------------------------------------------
+CHECK_REG   CMPI.B  #2, D5      *Destination mode 111 with registers greater than 1 are invalid
+            BGE     HEX_ERROR
             RTS
 
 
@@ -658,6 +790,7 @@ EAMode      DS.B    1
 EARegNum    DS.B    1
 BitLen      DS.B    1
 DestRegNum  DS.B    1
+DestMode    DS.B    1
 CurVal      DS.L    1
 DestAddr    DS.L    1
 InstructL   DS.B    1   *This holds the length of how many bits current instruction holds
@@ -673,6 +806,7 @@ EndOfFileMess   DC.B     'Would you like to disassemble file again? [y/n]',0
 
 
     END    START        ; last line of source
+
 
 
 
