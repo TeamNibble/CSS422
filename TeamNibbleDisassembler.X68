@@ -70,7 +70,7 @@ ENDOFFILE           LEA     EndOfFileMess, A1 *Asks the user if they would like 
                     TRAP    #15
                     MOVE.B  #5, D0 *Read a single character from the keyboard into D1
                     TRAP    #15
-                    CMP.B   D1, #$79 *If y is enetered restart program, else program will be terminated
+                    CMP.B   #$79, D1  *If y is enetered restart program, else program will be terminated
                     BEQ     GET_INPUT
                     MOVE.B  #9, D0   *Terminate the program
                     TRAP    #15
@@ -120,10 +120,10 @@ HEX_ERROR           LEA     ErrorMess,A1    *Print error message for invalid hex
                     MOVE.L  CurrentAddress, D1 * Move address into D1 to output
                     MOVE.B  #3,D0 * Display signed number in D1 in decimal. 
                     TRAP    #15   * Print out invalid address
-                    LEA     NewLine, A1 *Create new line
+                    *LEA     NewLine, A1 *Create new line
                     MOVE.B  #13,D0
                     TRAP    #15
-                    ADD.W  #$2, CurentAddress *Increment by Word Value for invalid opcode
+                    ADD.W  #$2, CurrentAddress *Increment by Word Value for invalid opcode
                     BRA     GET_INPUT       *Prompt the user to input again
                     
 NUMBER              SUBI.B  #$30,D2         *Convert to number in hex
@@ -298,6 +298,24 @@ OPCODE_BRA  MOVE.B  #$42,(A1)+  *Move char B
             MOVE.B  #$9,(A1)+   *Tab over
             MOVE.W  D4,D5       
             ADD.W   (A2),D5     *<PC> + Displacement
+
+*-----------------------------------------------------
+*First four bits are equal to 1000 - 
+*Possible OP-Codes:DIVU.W
+*-----------------------------------------------------
+IS_1000
+
+*-----------------------------------------------------
+*First four bits are equal to 1001 - 
+*Possible OP-Codes:SUB
+*-----------------------------------------------------
+IS_1001
+
+*-----------------------------------------------------
+*First four bits are equal to 1110 - 
+*Possible OP-Codes:LSL, ASL
+*-----------------------------------------------------
+IS_1110
             
 *-----------------------------------------------------
 *Handles the last portion of opcode read - Effective Address
@@ -734,6 +752,8 @@ GET_IMMEDIATE       CMPI.B     #8,BitLen   *Is it a byte data?
                     CMPI.B     #32,BitLen  *Is is a long data?
                     BEQ        GET_LONG_ADDRESS    *Reuse subroutine
                     RTS
+                    
+GET_BYTE    *TO-DO                    
 
 TO_ASCII_WORD            MOVE.W     D6,D7
                          LSR.W      #$8,D7
