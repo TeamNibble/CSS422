@@ -9,7 +9,7 @@ stackPointer    EQU $0FFF
 START:                  ; first instruction of program
 
 * Put program code here
-                    LEA     stackPointer,SP *Load stack address to the stack pointer
+                    *LEA     stackPointer,SP *Load stack address to the stack pointer
                     MOVEA.L #OutPut, A2     *Holds location for output values
                     
 GET_INPUT           MOVE.B  #13,D0
@@ -21,7 +21,7 @@ GET_INPUT           MOVE.B  #13,D0
                     JSR     TO_HEX          *Convert it to hex
                     BSR     CHECK_ADDRESS   *Check for valid address
                     MOVEA.L A0,A5           *Store the starting address in A5
-                    MOVEA   A2,CurrentAddress *Copies the staring address to the address tracker 
+                    MOVE.L  A5,CurrentAddress *Copies the staring address to the address tracker 
                     
                     MOVE.B  #13,D0          *Get the ending address
                     LEA     PromptMess2, A1
@@ -94,7 +94,7 @@ INVALID_ADDRESS     LEA     InvalidMess,A1
 *D3: stores the temperary converted address.
 *A0: stores the final converted address.
 *-----------------------------------------------------
-START_CONVERT       MOVEM.L D2-D3,-(SP)
+START_CONVERT       *MOVEM.L D2-D3,-(SP)
                     CLR     D2      *Clear the registers
                     CLR     D3
                     CLR     D4
@@ -147,7 +147,7 @@ CONTINUE            CMPI.W  #0,D1           *If the length of string = 0
                     BRA     TO_HEX          *Start another loop
 
 DONE_CONVERT        MOVE.L  D3,A0           *Move the converted address to A0
-                    MOVEM.L (SP)+,D2-D3
+                    *MOVEM.L (SP)+,D2-D3
                     RTS        
 
 START_DISASSEMBLE   MOVE.B  (A2)+,D4    *Move the instruction to D4
@@ -162,6 +162,7 @@ START_DISASSEMBLE   MOVE.B  (A2)+,D4    *Move the instruction to D4
 *Disassemble is finished- jumps back to main loop
 *-----------------------------------------------------
 DONE_DISASSEMBLE    *TO-DO jump back to main loop
+                    JMP     START
 
 *-----------------------------------------------------
 *Reads first four bits of OP-Code instruction and branches appropriately 
@@ -173,12 +174,18 @@ FIRST_FOUR_BITS     MOVE.W  D4,D5   *Move the instruction to decode
                     BEQ     HEX_ERROR
                     CMPI.B  #$04,D5 *If first 4 bits = Less than 4
                     BLT     MOVESIZE 
-                    CMPI.B  #$04,D5 *If first 4 bits = 0100
+                    CMPI.B  #$04,D5 *If first 4 bits = 0100 (4-General)
                     BEQ     IS_0100
-                    CMPI.B  #$06,D5 *If first 4 bits = 0110
+                    CMPI.B  #$06,D5 *If first 4 bits = 0110 (6-Bcc, BRA)
                     BEQ     IS_0110
-                    CMPI.B  #$13,D5 *If first 4 bits = 1101 (13-ADD)
+                    CMPI.B  #8, D5  *If first 4 bits = 1000 (8-DIVU.W)
+                    BEQ     IS_1000
+                    CMPI.B  #9, D5  *If first 4 bits = 1001 (9-SUB)
+                    BEQ     IS_1001
+                    CMPI.B  #13,D5  *If first 4 bits = 1101 (13-ADD)
                     BEQ     IS_1101
+                    CMPI.B  #14, D4 *If first 4 bits = 1110 (14-LSL, ASL)
+                    BEQ     IS_1110
                     BRA     HEX_ERROR *If none of the bits match print error - Need to change, can't reach RTS
                     RTS
                     
@@ -241,6 +248,7 @@ IS_0100     MOVE.W  D4,D5       *Move the instruction to decode
             BEQ     DECODE_4C   
             CMPI.B  #$06,D5     *It's NOT
             BEQ     OPCODE_NOT  
+            RTS
 
 DECODE_4C
             
@@ -249,22 +257,40 @@ DECODE_4E   MOVE.W  D4,D5
             BEQ     OPCODE_NOP
             CMPI.W  #$4E75,D5   *Check for RTS
             BEQ     OPCODE_RTS
+            BRA     OPCODE_JSR  *It's JSR
             
+OPCODE_JSR  MOVE.B  #$4A,(A1)+  *Move char J
+            MOVE.B  #$53,(A1)+  *Move char S
+            MOVE.B  #$52,(A1)+  *Move char R
+            MOVE.B  #$9,(A1)+   *Tab
+            MOVE.W  D4,D5
+            BRA     GET_EA      *Decode EA
+            RTS
             
 OPCODE_LEA  MOVE.B  #$4C,(A1)+  *Move char L
             MOVE.B  #$45,(A1)+  *Move char E
             MOVE.B  #$41,(A1)+  *Move char A
             MOVE.B  #$9,(A1)+   *Tab over
             BRA     GET_EA      *Decode EA
+            BRA     GET_REGISTER_An    *Get the register
+            RTS
 
+GET_REGISTER_An     JSR     BIT11109    *Get the register
+                    MOVE.B  D5, EARegNum *Assign register val to varaible
+                    MOVE.B  #$41,(A1)+  *Move char A
+                    ADDI.B  #$30,D5     *Convert number to string
+                    MOVE.B  D5, (A1)+   *Load converted string
+                    RTS
+                    
 *-----------------------------------------------------
 *First four bits are equal to 0110 - 
 *Possible OP-Codes:Bcc, BRA
 *-----------------------------------------------------
 IS_0110     MOVE.W  D4,D5
             LSR.W   #8,D5
-            CMPI.B  #$60,D5     *Check for BRA
+            CMPI.B  #$60,D5     *Check for BRA - first 8 bits = 0110 0000dx mnh gbv 
             BEQ     OPCODE_BRA  
+            *TO-DO Bcc
 
 OPCODE_BRA  MOVE.B  #$42,(A1)+  *Move char B
             MOVE.B  #$52,(A1)+  *Move char R
@@ -373,7 +399,7 @@ EA_APPEND   *TO-DO read how many bits are in the size
 *First four bits are equal to 1101 - prompt ADD
 *Will fill values for: BitLen, DnRegNum, OpSize, EAMode, EARegNum
 *-----------------------------------------------------
-IS_1101     MOVEM.L D0-D7/A0-A6, -(SP)  *Copy contents of all registers into previous SP
+IS_1101     *MOVEM.L D0-D7/A0-A6, -(SP)  *Copy contents of all registers into previous SP
             MOVE.B  #$41, (A1)+     *Move char A
             MOVE.B  #$44, (A1)+     *Move char D
             MOVE.B  #$44, (A1)+     *Move char D
@@ -461,7 +487,7 @@ OPCODE_RTS  MOVE.B  #$52,(A1)+  *R
 *-----------------------------------------------------	
 *Op-code move size manager - first four bits are 01(B), 11(W), 10(L)	
 *-----------------------------------------------------	
-MOVESIZE    MOVEM.L D0-D7/A0-A6, -(SP)
+MOVESIZE    *MOVEM.L D0-D7/A0-A6, -(SP)
             MOVE.B  #$4D,(A1)+  *Move char M	
             MOVE.B  #$4F,(A1)+  *Move char O	
             MOVE.B  #$56,(A1)+  *Move char V	
@@ -699,8 +725,15 @@ GET_LONG_ADDRESS    MOVE.B  (A2)+,D6    *Move the address to D6 to convert to st
                     MOVE.B  (A2)+,D6
                     LSL.L   #$4,D6
                     JSR     TO_ASCII_LONG    *Convert to string
+                    RTS
                     
-GET_IMMEDIATE       
+GET_IMMEDIATE       CMPI.B     #8,BitLen   *Is it a byte data?
+                    BEQ        GET_BYTE
+                    CMPI.B     #16,BitLen  *Is it a word data?
+                    BEQ        GET_WORD_ADDRESS    *Reuse subroutine
+                    CMPI.B     #32,BitLen  *Is is a long data?
+                    BEQ        GET_LONG_ADDRESS    *Reuse subroutine
+                    RTS
 
 TO_ASCII_WORD            MOVE.W     D6,D7
                          LSR.W      #$8,D7
@@ -738,19 +771,17 @@ TO_ASCII_WORD            MOVE.W     D6,D7
                          RTS
                          
 TO_ASCII_LONG            MOVE.L     D6,D7
-                         LSR.W      #$8,D7
+                         LSR.L      #$8,D7  *Get the first word
+                         LSR.L      #$8,D7
+                         LSR.W      #$8,D7  *Then convert the first word
                          LSR.W      #$4,D7  *Get the first bit/byte
-                         CMPI.B     #$9,D7
-                         BGT        ASCII_LETTER
-                         ADDI.B     #$30,D7
+                         JSR        TO_ASCII
                          MOVE.B     D7,(A1)+
                          MOVE.W     D6,D7
                          LSR.W      #$8,D7  *Get the second bit/byte
                          LSL.B      #$4,D7
                          LSR.B      #$4,D7
-                         CMPI.B     #$9,D7
-                         BGT        ASCII_LETTER
-                         ADDI.B     #$30,D7
+                         JSR        TO_ASCII
                          MOVE.B     D7,(A1)+
                          MOVE.W     D6,D7
                          LSR.W      #$4,D7  *Get the third bit/byte
@@ -758,21 +789,53 @@ TO_ASCII_LONG            MOVE.L     D6,D7
                          LSL.W      #$4,D7
                          LSR.W      #$8,D7
                          LSR.B      #$4,D7
-                         CMPI.B     #$9,D7
-                         BGT        ASCII_LETTER
-                         ADDI.B     #$30,D7
+                         JSR        TO_ASCII
+                         MOVE.B     D7,(A1)+
+                         MOVE.W     D6,D7
+                         LSL.W      #$8,D7  *Get the last bit/byte
+                         LSL.W      #$4,D7
+                         LSR.W      #$8,D7
+                         LSR.B      #$4,D7
+                         JSR        TO_ASCII
+                         MOVE.B     D7,(A1)+
+                         MOVE.L     D6,D7       *Get the second word
+                         LSR.W      #$8,D7  *Then convert the second word
+                         LSR.W      #$4,D7  *Get the first bit/byte
+                         JSR        TO_ASCII
+                         MOVE.B     D7,(A1)+
+                         MOVE.W     D6,D7
+                         LSR.W      #$8,D7  *Get the second bit/byte
+                         LSL.B      #$4,D7
+                         LSR.B      #$4,D7
+                         JSR        TO_ASCII
+                         MOVE.B     D7,(A1)+
+                         MOVE.W     D6,D7
+                         LSR.W      #$4,D7  *Get the third bit/byte
+                         LSL.W      #$8,D7
+                         LSL.W      #$4,D7
+                         LSR.W      #$8,D7
+                         LSR.B      #$4,D7
+                         JSR        TO_ASCII
                          MOVE.B     D7,(A1)+
                          LSL.W      #$8,D7  *Get the last bit/byte
                          LSL.W      #$4,D7
                          LSR.W      #$8,D7
                          LSR.B      #$4,D7
-                         CMPI.B     #$9,D7
-                         BGT        ASCII_LETTER
-                         ADDI.B     #$30,D7
+                         JSR        TO_ASCII
                          MOVE.B     D7,(A1)+
                          RTS
+
+TO_ASCII                CMPI.B      #9,D7
+                        BGT         ASCII_LETTER
+                        CMPI.B      #10,D7
+                        BLT         ASCII_NUMBER
+                        RTS
                          
-ASCII_LETTER                                       
+ASCII_LETTER            ADDI.B      #37,D7
+                        RTS
+                        
+ASCII_NUMBER            ADDI.B  #30, D7
+                        RTS
 
     SIMHALT             ; halt simulator
 
@@ -806,6 +869,7 @@ EndOfFileMess   DC.B     'Would you like to disassemble file again? [y/n]',0
 
 
     END    START        ; last line of source
+
 
 
 
